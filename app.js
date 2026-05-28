@@ -53,7 +53,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             filteredPrompts.forEach(prompt => {
                 const li = document.createElement('li');
                 const btn = document.createElement('button');
-                btn.className = 'w-full text-left px-3 py-2 rounded text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors truncate';
+                btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate';
+
+                // Add highlighting if this is the currently selected prompt
+                if (currentPrompt && currentPrompt.id === prompt.id) {
+                    btn.classList.add('bg-indigo-100', 'text-indigo-800', 'font-semibold');
+                } else {
+                    btn.classList.add('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+                }
+
                 btn.textContent = prompt.title;
                 btn.onclick = () => selectPrompt(prompt, category.name);
 
@@ -75,6 +83,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     function selectPrompt(prompt, categoryName) {
         currentPrompt = prompt;
 
+        // Re-render sidebar to update highlighting
+        renderSidebar(promptsData, searchInput.value);
+
         // Update UI
         welcomeMessage.classList.add('hidden');
         promptWorkspace.classList.remove('hidden');
@@ -89,9 +100,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         let match;
 
         while ((match = regex.exec(prompt.content)) !== null) {
+            const rawVar = match[1];
+            // Split variable name and hint
+            let varName = rawVar;
+            let varHint = "";
+
+            if (rawVar.includes("—")) {
+                const parts = rawVar.split("—");
+                varName = parts[0].trim();
+                varHint = parts[1].trim();
+            } else if (rawVar.includes(":")) {
+                const parts = rawVar.split(":");
+                varName = parts[0].trim();
+                varHint = parts[1].trim();
+            }
+
             // Avoid duplicates
-            if (!variables.includes(match[1])) {
-                variables.push(match[1]);
+            if (!variables.some(v => v.raw === rawVar)) {
+                variables.push({
+                    raw: rawVar,
+                    name: varName,
+                    hint: varHint
+                });
             }
         }
 
@@ -116,14 +146,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 const label = document.createElement('label');
                 label.className = 'text-xs font-semibold text-gray-600 uppercase';
-                label.textContent = variable;
-                label.setAttribute('for', `input-${variable}`);
+                label.textContent = variable.name;
+                label.setAttribute('for', `input-${variable.raw}`);
 
                 const input = document.createElement('textarea');
-                input.id = `input-${variable}`;
+                input.id = `input-${variable.raw}`;
                 input.className = 'w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-y';
                 input.rows = 2;
-                input.placeholder = `Enter ${variable}...`;
+                input.placeholder = variable.hint ? `e.g. ${variable.hint}` : `Enter ${variable.name}...`;
 
                 input.addEventListener('input', updateOutput);
 
@@ -140,24 +170,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let finalContent = currentPrompt.content;
 
-        variables.forEach(variable => {
-            const input = document.getElementById(`input-${variable}`);
-            const val = input && input.value.trim() !== '' ? input.value : `[${variable}]`;
+        // Escape HTML to prevent XSS before doing custom highlighting
+        finalContent = finalContent
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
 
-            // Replace all occurrences of [VARIABLE]
+        variables.forEach(variable => {
+            const input = document.getElementById(`input-${variable.raw}`);
+
             // We need to escape special characters in the variable name for the regex
-            const escapedVariable = variable.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
             const regex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
-            finalContent = finalContent.replace(regex, val);
+
+            if (input && input.value.trim() !== '') {
+                // Escape input to prevent XSS
+                let escapedVal = input.value
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+                const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
+                finalContent = finalContent.replace(regex, htmlVal);
+            } else {
+                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
+                finalContent = finalContent.replace(regex, htmlVal);
+            }
         });
 
-        promptOutput.value = finalContent;
+        // Since we changed promptOutput to a div, we use innerHTML for syntax highlighting
+        if (promptOutput.tagName === 'DIV') {
+            promptOutput.innerHTML = finalContent;
+        } else {
+            promptOutput.value = finalContent; // Fallback if still a textarea somehow
+        }
     }
 
     // Copy to Clipboard
     copyBtn.addEventListener('click', () => {
-        if (promptOutput.value) {
-            navigator.clipboard.writeText(promptOutput.value).then(() => {
+        // Handle both div (textContent) and textarea (value)
+        const textToCopy = promptOutput.tagName === 'DIV' ? promptOutput.textContent : promptOutput.value;
+
+        if (textToCopy) {
+            navigator.clipboard.writeText(textToCopy).then(() => {
                 copyToast.style.opacity = '1';
                 setTimeout(() => {
                     copyToast.style.opacity = '0';
