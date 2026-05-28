@@ -899,6 +899,9 @@ def parse_prompts():
             title = prompt_blocks[j+1].strip()
             content = prompt_blocks[j+2].strip()
 
+            if "How to Get Maximum Value From This Collection" in content:
+                content = content.replace("How to Get Maximum Value From This Collection", "").strip()
+
             prompts.append({
                 "id": pid,
                 "title": title,
