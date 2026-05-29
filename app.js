@@ -190,10 +190,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     .replace(/</g, '&lt;')
                     .replace(/>/g, '&gt;');
                 const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
-                finalContent = finalContent.replace(regex, htmlVal);
+                finalContent = finalContent.replace(regex, () => htmlVal);
             } else {
                 const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
-                finalContent = finalContent.replace(regex, htmlVal);
+                finalContent = finalContent.replace(regex, () => htmlVal);
             }
         });
 
