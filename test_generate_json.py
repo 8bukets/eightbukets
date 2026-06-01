@@ -1,74 +1,114 @@
 import unittest
-import generate_json
+from generate_json import parse_prompts
 
 class TestGenerateJson(unittest.TestCase):
-    def setUp(self):
-        # Save the original raw_data so we can restore it after tests
-        self.original_raw_data = generate_json.raw_data
-
-    def tearDown(self):
-        # Restore the original raw_data
-        generate_json.raw_data = self.original_raw_data
-
-    def test_parse_prompts_basic(self):
-        generate_json.raw_data = """
-Part 1: Content Creation (Prompts 1–2)
+    def test_parse_prompts_happy_path(self):
+        mock_data = """
+Part 1: Content Creation (Prompts 1–10)
 
 Prompt 1 — Full Article Writer
-You are an expert content strategist.
+You are an expert content strategist and writer specializing in [NICHE].
 Prompt 2 — Twitter/X Thread Writer
 You are a viral content writer for X/Twitter.
 """
-        result = generate_json.parse_prompts()
-        self.assertEqual(len(result["categories"]), 1)
-        self.assertEqual(result["categories"][0]["name"], "Content Creation")
-        self.assertEqual(len(result["categories"][0]["prompts"]), 2)
+        expected = {
+            "categories": [
+                {
+                    "name": "Content Creation",
+                    "prompts": [
+                        {
+                            "id": 1,
+                            "title": "Full Article Writer",
+                            "content": "You are an expert content strategist and writer specializing in [NICHE]."
+                        },
+                        {
+                            "id": 2,
+                            "title": "Twitter/X Thread Writer",
+                            "content": "You are a viral content writer for X/Twitter."
+                        }
+                    ]
+                }
+            ]
+        }
 
-        self.assertEqual(result["categories"][0]["prompts"][0]["id"], 1)
-        self.assertEqual(result["categories"][0]["prompts"][0]["title"], "Full Article Writer")
-        self.assertEqual(result["categories"][0]["prompts"][0]["content"], "You are an expert content strategist.")
-
-        self.assertEqual(result["categories"][0]["prompts"][1]["id"], 2)
-        self.assertEqual(result["categories"][0]["prompts"][1]["title"], "Twitter/X Thread Writer")
-        self.assertEqual(result["categories"][0]["prompts"][1]["content"], "You are a viral content writer for X/Twitter.")
+        result = parse_prompts(mock_data)
+        self.assertEqual(result, expected)
 
     def test_parse_prompts_multiple_categories(self):
-        generate_json.raw_data = """
-Part 1: Content Creation (Prompts 1–1)
-
-Prompt 1 — First Prompt
-First prompt content.
-Part 2: Marketing (Prompts 2–2)
-
-Prompt 2 — Second Prompt
-Second prompt content.
-"""
-        result = generate_json.parse_prompts()
-        self.assertEqual(len(result["categories"]), 2)
-        self.assertEqual(result["categories"][0]["name"], "Content Creation")
-        self.assertEqual(len(result["categories"][0]["prompts"]), 1)
-        self.assertEqual(result["categories"][1]["name"], "Marketing")
-        self.assertEqual(len(result["categories"][1]["prompts"]), 1)
-
-    def test_parse_prompts_removes_specific_string(self):
-        generate_json.raw_data = """
-Part 1: Content Creation (Prompts 1–1)
+        mock_data = """
+Part 1: Content Creation (Prompts 1–10)
 
 Prompt 1 — Full Article Writer
-How to Get Maximum Value From This Collection
-You are an expert content strategist.
+Content 1
+Part 2: Business and Strategy (Prompts 11–20)
+
+Prompt 11 — Competitive Analysis
+Content 11
 """
-        result = generate_json.parse_prompts()
-        self.assertEqual(len(result["categories"]), 1)
-        self.assertEqual(len(result["categories"][0]["prompts"]), 1)
+        expected = {
+            "categories": [
+                {
+                    "name": "Content Creation",
+                    "prompts": [
+                        {
+                            "id": 1,
+                            "title": "Full Article Writer",
+                            "content": "Content 1"
+                        }
+                    ]
+                },
+                {
+                    "name": "Business and Strategy",
+                    "prompts": [
+                        {
+                            "id": 11,
+                            "title": "Competitive Analysis",
+                            "content": "Content 11"
+                        }
+                    ]
+                }
+            ]
+        }
 
-        expected_content = "You are an expert content strategist."
-        self.assertEqual(result["categories"][0]["prompts"][0]["content"], expected_content)
+        result = parse_prompts(mock_data)
+        self.assertEqual(result, expected)
 
-    def test_parse_prompts_empty_data(self):
-        generate_json.raw_data = ""
-        result = generate_json.parse_prompts()
-        self.assertEqual(result["categories"], [])
+    def test_parse_prompts_empty_string(self):
+        mock_data = ""
+        expected = {"categories": []}
+        result = parse_prompts(mock_data)
+        self.assertEqual(result, expected)
+
+    def test_parse_prompts_no_categories_or_prompts(self):
+        mock_data = "Just some random text that does not match any regex."
+        expected = {"categories": []}
+        result = parse_prompts(mock_data)
+        self.assertEqual(result, expected)
+
+    def test_parse_prompts_removes_unwanted_text(self):
+        mock_data = """
+Part 1: Special Case (Prompts 1–1)
+
+Prompt 1 — Special Prompt
+This is some content. How to Get Maximum Value From This Collection More content here.
+"""
+        expected = {
+            "categories": [
+                {
+                    "name": "Special Case",
+                    "prompts": [
+                        {
+                            "id": 1,
+                            "title": "Special Prompt",
+                            "content": "This is some content.  More content here."
+                        }
+                    ]
+                }
+            ]
+        }
+
+        result = parse_prompts(mock_data)
+        self.assertEqual(result, expected)
 
 if __name__ == '__main__':
     unittest.main()
