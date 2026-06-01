@@ -4,4 +4,4 @@ test.js
 .gitignore
 user_prompt.txt
 existing_raw_data.txt
-coverage/
+__pycache__/

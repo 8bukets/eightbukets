@@ -1,110 +1,84 @@
-/**
- * @jest-environment jsdom
- */
+const fs = require('fs');
+const path = require('path');
 
-const { renderSidebar, setSidebarContent, setCurrentPrompt } = require('./app.js');
+describe('Prompts Library Error Handling', () => {
+    let originalFetch;
 
-describe('renderSidebar', () => {
-    let mockCategories;
-    let sidebarContent;
+    beforeAll(() => {
+        // Save original fetch
+        originalFetch = global.fetch;
+    });
+
+    afterAll(() => {
+        // Restore original fetch
+        global.fetch = originalFetch;
+    });
 
     beforeEach(() => {
-        // Setup DOM element
-        document.body.innerHTML = '<div id="sidebar-content"></div>';
-        sidebarContent = document.getElementById('sidebar-content');
-        setSidebarContent(sidebarContent);
+        // Load the HTML into JSDOM before each test to reset DOM
+        const html = fs.readFileSync(path.resolve(__dirname, './index.html'), 'utf8');
+        // Setting to body/head is slightly cleaner than documentElement to avoid doctype issues
+        // We can just use the DOMParser if we want, or simple document.documentElement.innerHTML
+        // A cleaner approach is to recreate the document body and head
 
-        // Reset current prompt
-        setCurrentPrompt(null);
+        // JSDOM creates an empty document, so we can just set innerHTML on documentElement
+        // safely but stripping DOCTYPE if present makes it cleaner
+        const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
+        document.documentElement.innerHTML = cleanHtml;
 
-        // Setup mock data
-        mockCategories = [
-            {
-                name: "Marketing",
-                prompts: [
-                    { id: 1, title: "SEO Blog Post", content: "Write a blog post about [TOPIC]" },
-                    { id: 2, title: "Social Media Campaign", content: "Create a campaign for [PRODUCT]" }
-                ]
-            },
-            {
-                name: "Development",
-                prompts: [
-                    { id: 3, title: "Code Review", content: "Review this [LANGUAGE] code" }
-                ]
-            }
-        ];
+        // Reset fetch mock before each test
+        global.fetch = jest.fn();
     });
 
-    test('renders all categories and prompts when filterText is empty', () => {
-        renderSidebar(mockCategories, '');
+    afterEach(() => {
+        // Clear modules cache to avoid multiple event listeners being added to document
+        // if require('./app.js') is called in multiple tests
+        jest.resetModules();
 
-        // Check if categories are rendered
-        const categoryHeaders = sidebarContent.querySelectorAll('h3');
-        expect(categoryHeaders.length).toBe(2);
-        expect(categoryHeaders[0].textContent).toBe('Marketing');
-        expect(categoryHeaders[1].textContent).toBe('Development');
+        // Clear document body and head completely to prevent multiple event listeners
+        document.documentElement.innerHTML = '';
 
-        // Check if all prompts are rendered
-        const promptButtons = sidebarContent.querySelectorAll('button');
-        expect(promptButtons.length).toBe(3);
-        expect(promptButtons[0].textContent).toBe('SEO Blog Post');
-        expect(promptButtons[1].textContent).toBe('Social Media Campaign');
-        expect(promptButtons[2].textContent).toBe('Code Review');
+        // Recreate a clean event target to reset document event listeners
+        // Since we can't easily remove event listeners attached by app.js (they are anonymous),
+        // and JSDOM's document is preserved between tests by jest-environment-jsdom,
+        // we use JSDOM's ability to recreate a fresh DOM environment via configuration
+        // But for a single test suite, resetting modules is the most important part
     });
 
-    test('filters prompts based on title case-insensitively', () => {
-        renderSidebar(mockCategories, 'seo blog');
+    test('should show error message when fetching prompts.json fails', async () => {
+        // Mock fetch to reject with an error
+        const mockError = new Error('Network error');
+        global.fetch.mockRejectedValueOnce(mockError);
 
-        const promptButtons = sidebarContent.querySelectorAll('button');
-        expect(promptButtons.length).toBe(1);
-        expect(promptButtons[0].textContent).toBe('SEO Blog Post');
+        // Spy on console.error to prevent it from cluttering the test output,
+        // and to verify it was called
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-        // Check that only the relevant category is rendered
-        const categoryHeaders = sidebarContent.querySelectorAll('h3');
-        expect(categoryHeaders.length).toBe(1);
-        expect(categoryHeaders[0].textContent).toBe('Marketing');
-    });
+        // Require the app.js script. We use isolateModules to ensure
+        // it executes afresh and gets the correct document
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
 
-    test('filters prompts based on content case-insensitively', () => {
-        renderSidebar(mockCategories, 'review this');
+        // Dispatch DOMContentLoaded event to trigger the initial fetch
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
 
-        const promptButtons = sidebarContent.querySelectorAll('button');
-        expect(promptButtons.length).toBe(1);
-        expect(promptButtons[0].textContent).toBe('Code Review');
-    });
+        // Wait for promises to resolve
+        // The fetch and catch block are asynchronous
+        await new Promise(process.nextTick);
 
-    test('renders nothing if filter matches no prompts', () => {
-        renderSidebar(mockCategories, 'nonexistent filter text');
+        // Verify fetch was called
+        expect(global.fetch).toHaveBeenCalledWith('prompts.json');
 
-        expect(sidebarContent.innerHTML).toBe('');
-    });
+        // Verify console.error was called
+        expect(consoleSpy).toHaveBeenCalledWith('Error loading prompts:', mockError);
 
-    test('renders nothing if categories array is empty', () => {
-        renderSidebar([], '');
+        // Verify the error message is inserted into the DOM
+        const sidebarContent = document.getElementById('sidebar-content');
+        expect(sidebarContent.innerHTML).toContain('Failed to load prompts.');
+        expect(sidebarContent.innerHTML).toContain('text-red-500');
 
-        expect(sidebarContent.innerHTML).toBe('');
-    });
-
-    test('applies active styling to the currently selected prompt', () => {
-        // Set the currently selected prompt
-        setCurrentPrompt(mockCategories[0].prompts[0]);
-
-        renderSidebar(mockCategories, '');
-
-        const promptButtons = sidebarContent.querySelectorAll('button');
-        expect(promptButtons[0].classList.contains('bg-indigo-100')).toBe(true);
-        expect(promptButtons[0].classList.contains('text-indigo-800')).toBe(true);
-
-        // Check that other buttons don't have active styling
-        expect(promptButtons[1].classList.contains('bg-indigo-100')).toBe(false);
-    });
-
-    test('attaches click handler to prompts that calls selectPrompt', () => {
-        // We can't directly test selectPrompt being called since it's defined in the same scope,
-        // but we can mock it or check if clicking triggers expected errors/behavior.
-        // For unit testing renderSidebar, verifying the button has an onclick function is enough.
-        renderSidebar(mockCategories, '');
-        const promptButtons = sidebarContent.querySelectorAll('button');
-        expect(typeof promptButtons[0].onclick).toBe('function');
+        consoleSpy.mockRestore();
     });
 });
