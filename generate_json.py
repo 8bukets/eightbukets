@@ -885,13 +885,15 @@ def parse_prompts():
     parts = re.split(r'Part \d+: (.*) \(Prompts \d+–\d+\)', raw_data)
     # The first element is empty string before Part 1
 
+    prompt_regex = re.compile(r'Prompt (\d+) — (.*)')
+
     for i in range(1, len(parts), 2):
         category_name = parts[i].strip()
         category_content = parts[i+1].strip()
 
         prompts = []
         # Split by "Prompt X — Title"
-        prompt_blocks = re.split(r'Prompt (\d+) — (.*)', category_content)
+        prompt_blocks = prompt_regex.split(category_content)
         # first element could be empty or just newline
         for j in range(1, len(prompt_blocks), 3):
             pid = int(prompt_blocks[j])

@@ -16,6 +16,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentPrompt = null;
     let variables = [];
 
+    // Helper to escape HTML and prevent XSS
+    function escapeHTML(str) {
+        if (!str) return str;
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
     // Fetch JSON data
     try {
         const response = await fetch('prompts.json');
@@ -31,10 +40,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderSidebar(categories, filterText = '') {
         sidebarContent.innerHTML = '';
 
+        const filterTextLower = filterText.toLowerCase();
+
         categories.forEach(category => {
             const filteredPrompts = category.prompts.filter(prompt =>
-                prompt.title.toLowerCase().includes(filterText.toLowerCase()) ||
-                prompt.content.toLowerCase().includes(filterText.toLowerCase())
+                prompt.title.toLowerCase().includes(filterTextLower) ||
+                prompt.content.toLowerCase().includes(filterTextLower)
             );
 
             if (filteredPrompts.length === 0) return;
@@ -97,10 +108,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Parse variables like [TOPIC], [YOUR NICHE]
         const regex = /\[(.*?)\]/g;
         variables = [];
+        const seenVars = new Set();
         let match;
 
         while ((match = regex.exec(prompt.content)) !== null) {
             const rawVar = match[1];
+
+            // Avoid duplicates
+            if (seenVars.has(rawVar)) {
+                continue;
+            }
+            seenVars.add(rawVar);
+
             // Split variable name and hint
             let varName = rawVar;
             let varHint = "";
@@ -115,14 +134,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 varHint = parts[1].trim();
             }
 
-            // Avoid duplicates
-            if (!variables.some(v => v.raw === rawVar)) {
-                variables.push({
-                    raw: rawVar,
-                    name: varName,
-                    hint: varHint
-                });
-            }
+            variables.push({
+                raw: rawVar,
+                name: varName,
+                hint: varHint
+            });
         }
 
         renderForm();
@@ -170,44 +186,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let finalContent = currentPrompt.content;
 
-        if (promptOutput.tagName === 'DIV') {
-            promptOutput.textContent = ''; // Clear existing content
+        // Escape HTML to prevent XSS before doing custom highlighting
+        finalContent = escapeHTML(finalContent);
 
-            const regex = /\[(.*?)\]/g;
-            let lastIndex = 0;
-            let match;
+        variables.forEach(variable => {
+            const input = document.getElementById(`input-${variable.raw}`);
 
-            while ((match = regex.exec(finalContent)) !== null) {
-                // Add text before the match
-                const textBefore = finalContent.substring(lastIndex, match.index);
-                if (textBefore) {
-                    promptOutput.appendChild(document.createTextNode(textBefore));
-                }
+            // We need to escape special characters in the variable name for the regex
+            const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const regex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
 
-                const rawVar = match[1];
-                const fullMatch = match[0];
-
-                // Find if this is one of our parsed variables
-                const variable = variables.find(v => v.raw === rawVar);
-
-                if (variable) {
-                    const input = document.getElementById(`input-${variable.raw}`);
-                    const span = document.createElement('span');
-
-                    if (input && input.value.trim() !== '') {
-                        span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
-                        span.textContent = input.value;
-                    } else {
-                        span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
-                        span.textContent = `[${variable.raw}]`;
-                    }
-                    promptOutput.appendChild(span);
-                } else {
-                    // Not a recognized variable, just add it as text
-                    promptOutput.appendChild(document.createTextNode(fullMatch));
-                }
-
-                lastIndex = regex.lastIndex;
+            if (input && input.value.trim() !== '') {
+                // Escape input to prevent XSS
+                let escapedVal = escapeHTML(input.value);
+                const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
+                finalContent = finalContent.replace(regex, () => htmlVal);
+            } else {
+                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
+                finalContent = finalContent.replace(regex, () => htmlVal);
             }
 
             // Add any remaining text
