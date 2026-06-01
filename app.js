@@ -198,17 +198,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         // Since we changed promptOutput to a div, we use innerHTML for syntax highlighting
-        if (promptOutput.tagName === 'DIV') {
-            promptOutput.innerHTML = finalContent;
-        } else {
-            promptOutput.value = finalContent; // Fallback if still a textarea somehow
-        }
+        promptOutput.innerHTML = finalContent;
     }
 
     // Copy to Clipboard
     copyBtn.addEventListener('click', () => {
-        // Handle both div (textContent) and textarea (value)
-        const textToCopy = promptOutput.tagName === 'DIV' ? promptOutput.textContent : promptOutput.value;
+        const textToCopy = promptOutput.textContent;
 
         if (textToCopy) {
             navigator.clipboard.writeText(textToCopy).then(() => {
