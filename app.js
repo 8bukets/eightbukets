@@ -104,13 +104,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Split variable name and hint
             let varName = rawVar;
             let varHint = "";
-
-            if (rawVar.includes("—")) {
-                const parts = rawVar.split("—");
-                varName = parts[0].trim();
-                varHint = parts[1].trim();
-            } else if (rawVar.includes(":")) {
-                const parts = rawVar.split(":");
+            const separator = ['—', ':'].find(s => rawVar.includes(s));
+            if (separator) {
+                const parts = rawVar.split(separator);
                 varName = parts[0].trim();
                 varHint = parts[1].trim();
             }
