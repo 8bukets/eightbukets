@@ -97,10 +97,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Parse variables like [TOPIC], [YOUR NICHE]
         const regex = /\[(.*?)\]/g;
         variables = [];
+        const seenVariables = new Set();
         let match;
 
         while ((match = regex.exec(prompt.content)) !== null) {
             const rawVar = match[1];
+
+            // Avoid duplicates
+            if (seenVariables.has(rawVar)) {
+                continue;
+            }
+            seenVariables.add(rawVar);
+
             // Split variable name and hint
             let varName = rawVar;
             let varHint = "";
@@ -115,14 +123,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 varHint = parts[1].trim();
             }
 
-            // Avoid duplicates
-            if (!variables.some(v => v.raw === rawVar)) {
-                variables.push({
-                    raw: rawVar,
-                    name: varName,
-                    hint: varHint
-                });
-            }
+            variables.push({
+                raw: rawVar,
+                name: varName,
+                hint: varHint
+            });
         }
 
         renderForm();
