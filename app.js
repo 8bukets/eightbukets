@@ -192,18 +192,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         variables.forEach(variable => {
             const input = document.getElementById(`input-${variable.raw}`);
 
-            // We need to escape special characters in the variable name for the regex
-            const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            const regex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
-
             if (input && input.value.trim() !== '') {
                 // Escape input to prevent XSS
                 let escapedVal = escapeHTML(input.value);
                 const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
-                finalContent = finalContent.replace(regex, () => htmlVal);
+                finalContent = finalContent.replace(variable.regex, () => htmlVal);
             } else {
                 const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
-                finalContent = finalContent.replace(regex, () => htmlVal);
+                finalContent = finalContent.replace(variable.regex, () => htmlVal);
             }
 
             // Add any remaining text
