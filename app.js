@@ -85,10 +85,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Search functionality
-    searchInput.addEventListener('input', (e) => {
-        renderSidebar(promptsData, e.target.value);
-    });
 
     function parseVariables(content) {
         const regex = /\[(.*?)\]/g;
@@ -224,6 +220,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+document.addEventListener('DOMContentLoaded', async () => {
+    sidebarContent = document.getElementById('sidebar-content');
+    searchInput = document.getElementById('search-input');
+    welcomeMessage = document.getElementById('welcome-message');
+    promptWorkspace = document.getElementById('prompt-workspace');
+    promptCategory = document.getElementById('prompt-category');
+    promptTitle = document.getElementById('prompt-title');
+    dynamicForm = document.getElementById('dynamic-form');
+    promptOutput = document.getElementById('prompt-output');
+    copyBtn = document.getElementById('copy-btn');
+    copyToast = document.getElementById('copy-toast');
+    noVariablesMsg = document.getElementById('no-variables-msg');
+
+    // Fetch JSON data
+    try {
+        const response = await fetch('prompts.json');
+        const data = await response.json();
+        promptsData = data.categories;
+        renderSidebar(promptsData);
+    } catch (error) {
+        console.error('Error loading prompts:', error);
+        if (sidebarContent) sidebarContent.innerHTML = '<p class="text-red-500">Failed to load prompts.</p>';
+    }
+
+    // Search functionality
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            renderSidebar(promptsData, e.target.value);
+        });
+    }
+
     // Copy to Clipboard
     copyBtn.addEventListener('click', () => {
         const textToCopy = promptOutput.textContent;
@@ -240,3 +267,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        renderSidebar,
+        selectPrompt,
+        renderForm,
+        updateOutput,
+        setPromptsData: (data) => promptsData = data,
+        setCurrentPrompt: (prompt) => currentPrompt = prompt,
+        getCurrentPrompt: () => currentPrompt,
+        setSearchInput: (el) => searchInput = el,
+        setSidebarContent: (el) => sidebarContent = el
+    };
+}
