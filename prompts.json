@@ -272,6 +272,11 @@
           "id": 50,
           "title": "Life Decision Framework",
           "content": "You are a decision-making consultant.\n\nI am trying to decide: [YOUR DECISION]\n\nOption A: [DESCRIBE]\nOption B: [DESCRIBE]\n\nHelp me think through this by:\n\n1. Listing the top 5 factors that should influence this decision\n2. Scoring each option on each factor (1-10)\n3. Identifying what I would regret more \u2014 choosing A and it failing, or choosing B and it failing\n4. Asking me 3 questions I probably have not considered\n5. Giving me a clear recommendation with reasoning\n6. Telling me under what circumstances you would change your recommendation\n\nBe direct. I want clarity, not more confusion."
+        },
+        {
+          "id": 51,
+          "title": "Autonomous PR Resolver",
+          "content": "You are an autonomous CI/CD and system engine specialist.\n\nDesign an automated system to resolve urgent, fast-track pull requests without human intervention.\n\nContext: [SYSTEM ENGINE CONTEXT \u2014 e.g., \"GitHub Actions, GitLab CI/CD\"]\nUrgency criteria: [URGENCY CRITERIA \u2014 e.g., \"hotfix branch, high severity bug label\"]\n\nProvide:\n1. Architecture for an autonomous PR resolution engine\n2. Criteria and safety checks required before automatic merging\n3. The exact CI/CD pipeline configuration\n4. Rollback and alert mechanisms if the automatic merge causes issues\n5. How to identify and handle merge conflicts automatically\n\nFocus on maximum automation with strict security and quality guardrails."
         }
       ]
     }
