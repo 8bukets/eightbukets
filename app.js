@@ -90,28 +90,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderSidebar(promptsData, e.target.value);
     });
 
-    // Select a prompt
-    function selectPrompt(prompt, categoryName) {
-        currentPrompt = prompt;
-
-        // Re-render sidebar to update highlighting
-        renderSidebar(promptsData, searchInput.value);
-
-        // Update UI
-        welcomeMessage.classList.add('hidden');
-        promptWorkspace.classList.remove('hidden');
-        promptWorkspace.classList.add('flex');
-
-        promptCategory.textContent = categoryName;
-        promptTitle.textContent = prompt.title;
-
-        // Parse variables like [TOPIC], [YOUR NICHE]
+    function parseVariables(content) {
         const regex = /\[(.*?)\]/g;
         variables = [];
         const seenVars = new Set();
         let match;
 
-        while ((match = regex.exec(prompt.content)) !== null) {
+        while ((match = regex.exec(content)) !== null) {
             const rawVar = match[1];
 
             // Avoid duplicates
@@ -140,6 +125,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                 hint: varHint
             });
         }
+        return parsedVariables;
+    }
+
+    // Select a prompt
+    function selectPrompt(prompt, categoryName) {
+        currentPrompt = prompt;
+
+        // Re-render sidebar to update highlighting
+        renderSidebar(promptsData, searchInput.value);
+
+        // Update UI
+        welcomeMessage.classList.add('hidden');
+        promptWorkspace.classList.remove('hidden');
+        promptWorkspace.classList.add('flex');
+
+        promptCategory.textContent = categoryName;
+        promptTitle.textContent = prompt.title;
+
+        // Parse variables like [TOPIC], [YOUR NICHE]
+        variables = parseVariables(prompt.content);
 
         renderForm();
         updateOutput();
