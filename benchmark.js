@@ -1,58 +1,112 @@
-const { performance } = require('perf_hooks');
+const iterations = 100000;
 
-function benchmark(numVariables) {
-    // Generate a prompt content with many duplicate and unique variables
-    let content = "";
-    for (let i = 0; i < numVariables; i++) {
-        // Add a mix of unique and duplicate variables
-        content += `[VAR_${i}] `;
-        for (let j = 0; j < 10; j++) { // 10 duplicates for every unique
-            content += `[VAR_${i}] `;
+// Mock data
+const promptContent = "Write a blog post about [TOPIC] for [TARGET AUDIENCE]. Ensure the tone is [TONE].";
+const variables = [
+  { raw: "TOPIC", name: "TOPIC", hint: "" },
+  { raw: "TARGET AUDIENCE", name: "TARGET AUDIENCE", hint: "" },
+  { raw: "TONE", name: "TONE", hint: "" }
+];
+
+const mockInputs = {
+  "TOPIC": "artificial intelligence",
+  "TARGET AUDIENCE": "software engineers",
+  "TONE": "professional"
+};
+
+// Original implementation
+function originalUpdateOutput() {
+    let finalContent = promptContent;
+
+    finalContent = finalContent
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    variables.forEach(variable => {
+        const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const regex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
+
+        const val = mockInputs[variable.raw];
+        if (val) {
+            let escapedVal = val
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
+            finalContent = finalContent.replace(regex, () => htmlVal);
+        } else {
+            const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
+            finalContent = finalContent.replace(regex, () => htmlVal);
         }
-    }
-
-    const regex = /\[(.*?)\]/g;
-    let variables = [];
-    const seenVariables = new Set();
-    let match;
-
-    const start = performance.now();
-
-    while ((match = regex.exec(content)) !== null) {
-        const rawVar = match[1];
-
-        // Avoid duplicates
-        if (seenVariables.has(rawVar)) {
-            continue;
-        }
-        seenVariables.add(rawVar);
-
-        // Split variable name and hint
-        let varName = rawVar;
-        let varHint = "";
-
-        if (rawVar.includes("—")) {
-            const parts = rawVar.split("—");
-            varName = parts[0].trim();
-            varHint = parts[1].trim();
-        } else if (rawVar.includes(":")) {
-            const parts = rawVar.split(":");
-            varName = parts[0].trim();
-            varHint = parts[1].trim();
-        }
-
-        variables.push({
-            raw: rawVar,
-            name: varName,
-            hint: varHint
-        });
-    }
-
-    const end = performance.now();
-    return end - start;
+    });
+    return finalContent;
 }
 
-const n = 2000;
-console.log(`Benchmarking with ${n} unique variables (and ${n * 10} duplicates)...`);
-const time = benchmark(n);
-console.log(`Time taken: ${time.toFixed(2)} ms`);
+// Optimized implementation (to test and verify)
+function optimizedUpdateOutput() {
+    let finalContent = promptContent;
+
+    finalContent = finalContent
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    variables.forEach(variable => {
+        // Cache the regex on the variable if not present
+        if (!variable.regex) {
+            const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            variable.regex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
+        }
+
+        const val = mockInputs[variable.raw];
+        if (val) {
+            let escapedVal = val
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
+            finalContent = finalContent.replace(variable.regex, () => htmlVal);
+        } else {
+            const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
+            finalContent = finalContent.replace(variable.regex, () => htmlVal);
+        }
+    });
+    return finalContent;
+}
+
+// Ensure both implementations return the same result
+if (originalUpdateOutput() !== optimizedUpdateOutput()) {
+    console.error("Mismatch in outputs!");
+    console.error("Original:", originalUpdateOutput());
+    console.error("Optimized:", optimizedUpdateOutput());
+    process.exit(1);
+}
+
+// Benchmark
+console.log(`Running benchmark with ${iterations} iterations...`);
+
+const startOriginal = performance.now();
+for (let i = 0; i < iterations; i++) {
+    originalUpdateOutput();
+}
+const endOriginal = performance.now();
+const timeOriginal = endOriginal - startOriginal;
+
+// Reset variable cache
+variables.forEach(v => delete v.regex);
+
+// Pre-warm the cache for optimized version
+optimizedUpdateOutput();
+
+const startOptimized = performance.now();
+for (let i = 0; i < iterations; i++) {
+    optimizedUpdateOutput();
+}
+const endOptimized = performance.now();
+const timeOptimized = endOptimized - startOptimized;
+
+console.log(`Original Time: ${timeOriginal.toFixed(2)} ms`);
+console.log(`Optimized Time: ${timeOptimized.toFixed(2)} ms`);
+console.log(`Improvement: ${((timeOriginal - timeOptimized) / timeOriginal * 100).toFixed(2)}%`);
+console.log(`Speedup: ${(timeOriginal / timeOptimized).toFixed(2)}x`);
