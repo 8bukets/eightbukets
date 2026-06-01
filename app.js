@@ -79,27 +79,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderSidebar(promptsData, e.target.value);
     });
 
-    // Select a prompt
-    function selectPrompt(prompt, categoryName) {
-        currentPrompt = prompt;
-
-        // Re-render sidebar to update highlighting
-        renderSidebar(promptsData, searchInput.value);
-
-        // Update UI
-        welcomeMessage.classList.add('hidden');
-        promptWorkspace.classList.remove('hidden');
-        promptWorkspace.classList.add('flex');
-
-        promptCategory.textContent = categoryName;
-        promptTitle.textContent = prompt.title;
-
-        // Parse variables like [TOPIC], [YOUR NICHE]
+    function parseVariables(content) {
         const regex = /\[(.*?)\]/g;
-        variables = [];
+        const parsedVariables = [];
         let match;
 
-        while ((match = regex.exec(prompt.content)) !== null) {
+        while ((match = regex.exec(content)) !== null) {
             const rawVar = match[1];
             // Split variable name and hint
             let varName = rawVar;
@@ -116,14 +101,34 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             // Avoid duplicates
-            if (!variables.some(v => v.raw === rawVar)) {
-                variables.push({
+            if (!parsedVariables.some(v => v.raw === rawVar)) {
+                parsedVariables.push({
                     raw: rawVar,
                     name: varName,
                     hint: varHint
                 });
             }
         }
+        return parsedVariables;
+    }
+
+    // Select a prompt
+    function selectPrompt(prompt, categoryName) {
+        currentPrompt = prompt;
+
+        // Re-render sidebar to update highlighting
+        renderSidebar(promptsData, searchInput.value);
+
+        // Update UI
+        welcomeMessage.classList.add('hidden');
+        promptWorkspace.classList.remove('hidden');
+        promptWorkspace.classList.add('flex');
+
+        promptCategory.textContent = categoryName;
+        promptTitle.textContent = prompt.title;
+
+        // Parse variables like [TOPIC], [YOUR NICHE]
+        variables = parseVariables(prompt.content);
 
         renderForm();
         updateOutput();
