@@ -31,10 +31,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderSidebar(categories, filterText = '') {
         sidebarContent.innerHTML = '';
 
+        const filterTextLower = filterText.toLowerCase();
+
         categories.forEach(category => {
             const filteredPrompts = category.prompts.filter(prompt =>
-                prompt.title.toLowerCase().includes(filterText.toLowerCase()) ||
-                prompt.content.toLowerCase().includes(filterText.toLowerCase())
+                prompt.title.toLowerCase().includes(filterTextLower) ||
+                prompt.content.toLowerCase().includes(filterTextLower)
             );
 
             if (filteredPrompts.length === 0) return;
