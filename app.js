@@ -174,7 +174,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         finalContent = finalContent
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
 
         variables.forEach(variable => {
             const input = document.getElementById(`input-${variable.raw}`);
@@ -188,7 +190,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let escapedVal = input.value
                     .replace(/&/g, '&amp;')
                     .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;');
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
                 const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
                 finalContent = finalContent.replace(regex, () => htmlVal);
             } else {
