@@ -1,8 +1,7 @@
 node_modules/
-package-lock.json
-package.json
 screenshot.png
 test.js
 .gitignore
 user_prompt.txt
 existing_raw_data.txt
+coverage/

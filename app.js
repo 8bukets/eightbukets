@@ -1,37 +1,28 @@
-document.addEventListener('DOMContentLoaded', async () => {
-    const sidebarContent = document.getElementById('sidebar-content');
-    const searchInput = document.getElementById('search-input');
-    const welcomeMessage = document.getElementById('welcome-message');
-    const promptWorkspace = document.getElementById('prompt-workspace');
+// State variables
+let sidebarContent;
+let searchInput;
+let welcomeMessage;
+let promptWorkspace;
+let promptCategory;
+let promptTitle;
+let dynamicForm;
+let promptOutput;
+let copyBtn;
+let copyToast;
+let noVariablesMsg;
 
-    const promptCategory = document.getElementById('prompt-category');
-    const promptTitle = document.getElementById('prompt-title');
-    const dynamicForm = document.getElementById('dynamic-form');
-    const promptOutput = document.getElementById('prompt-output');
-    const copyBtn = document.getElementById('copy-btn');
-    const copyToast = document.getElementById('copy-toast');
-    const noVariablesMsg = document.getElementById('no-variables-msg');
+let promptsData = [];
+let currentPrompt = null;
+let variables = [];
 
-    let promptsData = [];
-    let currentPrompt = null;
-    let variables = [];
+// Render Sidebar
+function renderSidebar(categories, filterText = '') {
+    if (!sidebarContent) sidebarContent = document.getElementById('sidebar-content');
+    if (!sidebarContent) return;
 
-    // Fetch JSON data
-    try {
-        const response = await fetch('prompts.json');
-        const data = await response.json();
-        promptsData = data.categories;
-        renderSidebar(promptsData);
-    } catch (error) {
-        console.error('Error loading prompts:', error);
-        sidebarContent.innerHTML = '<p class="text-red-500">Failed to load prompts.</p>';
-    }
+    sidebarContent.innerHTML = '';
 
-    // Render Sidebar
-    function renderSidebar(categories, filterText = '') {
-        sidebarContent.innerHTML = '';
-
-        categories.forEach(category => {
+    categories.forEach(category => {
             const filteredPrompts = category.prompts.filter(prompt =>
                 prompt.title.toLowerCase().includes(filterText.toLowerCase()) ||
                 prompt.content.toLowerCase().includes(filterText.toLowerCase())
@@ -74,10 +65,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Search functionality
-    searchInput.addEventListener('input', (e) => {
-        renderSidebar(promptsData, e.target.value);
-    });
 
     // Select a prompt
     function selectPrompt(prompt, categoryName) {
@@ -198,27 +185,74 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         // Since we changed promptOutput to a div, we use innerHTML for syntax highlighting
-        if (promptOutput.tagName === 'DIV') {
+        if (promptOutput && promptOutput.tagName === 'DIV') {
             promptOutput.innerHTML = finalContent;
-        } else {
+        } else if (promptOutput) {
             promptOutput.value = finalContent; // Fallback if still a textarea somehow
         }
     }
 
-    // Copy to Clipboard
-    copyBtn.addEventListener('click', () => {
-        // Handle both div (textContent) and textarea (value)
-        const textToCopy = promptOutput.tagName === 'DIV' ? promptOutput.textContent : promptOutput.value;
+document.addEventListener('DOMContentLoaded', async () => {
+    sidebarContent = document.getElementById('sidebar-content');
+    searchInput = document.getElementById('search-input');
+    welcomeMessage = document.getElementById('welcome-message');
+    promptWorkspace = document.getElementById('prompt-workspace');
+    promptCategory = document.getElementById('prompt-category');
+    promptTitle = document.getElementById('prompt-title');
+    dynamicForm = document.getElementById('dynamic-form');
+    promptOutput = document.getElementById('prompt-output');
+    copyBtn = document.getElementById('copy-btn');
+    copyToast = document.getElementById('copy-toast');
+    noVariablesMsg = document.getElementById('no-variables-msg');
 
-        if (textToCopy) {
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                copyToast.style.opacity = '1';
-                setTimeout(() => {
-                    copyToast.style.opacity = '0';
-                }, 2000);
-            }).catch(err => {
-                console.error('Failed to copy: ', err);
-            });
-        }
-    });
+    // Fetch JSON data
+    try {
+        const response = await fetch('prompts.json');
+        const data = await response.json();
+        promptsData = data.categories;
+        renderSidebar(promptsData);
+    } catch (error) {
+        console.error('Error loading prompts:', error);
+        if (sidebarContent) sidebarContent.innerHTML = '<p class="text-red-500">Failed to load prompts.</p>';
+    }
+
+    // Search functionality
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            renderSidebar(promptsData, e.target.value);
+        });
+    }
+
+    // Copy to Clipboard
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+            // Handle both div (textContent) and textarea (value)
+            const textToCopy = promptOutput.tagName === 'DIV' ? promptOutput.textContent : promptOutput.value;
+
+            if (textToCopy) {
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    copyToast.style.opacity = '1';
+                    setTimeout(() => {
+                        copyToast.style.opacity = '0';
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy: ', err);
+                });
+            }
+        });
+    }
 });
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        renderSidebar,
+        selectPrompt,
+        renderForm,
+        updateOutput,
+        setPromptsData: (data) => promptsData = data,
+        setCurrentPrompt: (prompt) => currentPrompt = prompt,
+        getCurrentPrompt: () => currentPrompt,
+        setSearchInput: (el) => searchInput = el,
+        setSidebarContent: (el) => sidebarContent = el
+    };
+}
