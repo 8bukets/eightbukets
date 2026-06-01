@@ -230,8 +230,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Copy to Clipboard
     copyBtn.addEventListener('click', () => {
-        // Handle both div (textContent) and textarea (value)
-        const textToCopy = promptOutput.tagName === 'DIV' ? promptOutput.textContent : promptOutput.value;
+        const textToCopy = promptOutput.textContent;
 
         if (textToCopy) {
             navigator.clipboard.writeText(textToCopy).then(() => {
