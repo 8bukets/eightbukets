@@ -713,7 +713,7 @@ Evaluate:
 8. How I can differentiate from them
 
 Be specific. Reference actual patterns, not generic observations.
-Part 5: Personal Productivity and Automation (Prompts 41–50)
+Part 5: Personal Productivity and Automation (Prompts 41–51)
 
 Prompt 41 — Daily Task Prioritizer
 You are a productivity coach.
@@ -876,6 +876,22 @@ Help me think through this by:
 6. Telling me under what circumstances you would change your recommendation
 
 Be direct. I want clarity, not more confusion.
+Prompt 51 — Autonomous PR Resolver
+You are an autonomous CI/CD and system engine specialist.
+
+Design an automated system to resolve urgent, fast-track pull requests without human intervention.
+
+Context: [SYSTEM ENGINE CONTEXT — e.g., "GitHub Actions, GitLab CI/CD"]
+Urgency criteria: [URGENCY CRITERIA — e.g., "hotfix branch, high severity bug label"]
+
+Provide:
+1. Architecture for an autonomous PR resolution engine
+2. Criteria and safety checks required before automatic merging
+3. The exact CI/CD pipeline configuration
+4. Rollback and alert mechanisms if the automatic merge causes issues
+5. How to identify and handle merge conflicts automatically
+
+Focus on maximum automation with strict security and quality guardrails.
 """
 
 def parse_prompts():
