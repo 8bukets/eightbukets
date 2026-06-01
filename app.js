@@ -16,6 +16,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentPrompt = null;
     let variables = [];
 
+    // Helper to escape HTML and prevent XSS
+    function escapeHTML(str) {
+        if (!str) return str;
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
     // Fetch JSON data
     try {
         const response = await fetch('prompts.json');
@@ -31,10 +40,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderSidebar(categories, filterText = '') {
         sidebarContent.innerHTML = '';
 
+        const filterTextLower = filterText.toLowerCase();
+
         categories.forEach(category => {
             const filteredPrompts = category.prompts.filter(prompt =>
-                prompt.title.toLowerCase().includes(filterText.toLowerCase()) ||
-                prompt.content.toLowerCase().includes(filterText.toLowerCase())
+                prompt.title.toLowerCase().includes(filterTextLower) ||
+                prompt.content.toLowerCase().includes(filterTextLower)
             );
 
             if (filteredPrompts.length === 0) return;
@@ -79,6 +90,40 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderSidebar(promptsData, e.target.value);
     });
 
+    function parseVariables(content) {
+        const regex = /\[(.*?)\]/g;
+        variables = [];
+        const seenVars = new Set();
+        let match;
+
+        while ((match = regex.exec(content)) !== null) {
+            const rawVar = match[1];
+
+            // Avoid duplicates
+            if (seenVars.has(rawVar)) {
+                continue;
+            }
+            seenVars.add(rawVar);
+
+            // Split variable name and hint
+            let varName = rawVar;
+            let varHint = "";
+            const separator = ['—', ':'].find(s => rawVar.includes(s));
+            if (separator) {
+                const parts = rawVar.split(separator);
+                varName = parts[0].trim();
+                varHint = parts[1].trim();
+            }
+
+            variables.push({
+                raw: rawVar,
+                name: varName,
+                hint: varHint
+            });
+        }
+        return parsedVariables;
+    }
+
     // Select a prompt
     function selectPrompt(prompt, categoryName) {
         currentPrompt = prompt;
@@ -95,31 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         promptTitle.textContent = prompt.title;
 
         // Parse variables like [TOPIC], [YOUR NICHE]
-        const regex = /\[(.*?)\]/g;
-        variables = [];
-        let match;
-
-        while ((match = regex.exec(prompt.content)) !== null) {
-            const rawVar = match[1];
-            // Split variable name and hint
-            let varName = rawVar;
-            let varHint = "";
-            const separator = ['—', ':'].find(s => rawVar.includes(s));
-            if (separator) {
-                const parts = rawVar.split(separator);
-                varName = parts[0].trim();
-                varHint = parts[1].trim();
-            }
-
-            // Avoid duplicates
-            if (!variables.some(v => v.raw === rawVar)) {
-                variables.push({
-                    raw: rawVar,
-                    name: varName,
-                    hint: varHint
-                });
-            }
-        }
+        variables = parseVariables(prompt.content);
 
         renderForm();
         updateOutput();
@@ -167,44 +188,45 @@ document.addEventListener('DOMContentLoaded', async () => {
         let finalContent = currentPrompt.content;
 
         // Escape HTML to prevent XSS before doing custom highlighting
-        finalContent = finalContent
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+        finalContent = escapeHTML(finalContent);
 
         variables.forEach(variable => {
             const input = document.getElementById(`input-${variable.raw}`);
 
-            // We need to escape special characters in the variable name for the regex
-            const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            const regex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
-
             if (input && input.value.trim() !== '') {
                 // Escape input to prevent XSS
-                let escapedVal = input.value
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;');
+                let escapedVal = escapeHTML(input.value);
                 const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
-                finalContent = finalContent.replace(regex, () => htmlVal);
+                finalContent = finalContent.replace(variable.regex, () => htmlVal);
             } else {
                 const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
-                finalContent = finalContent.replace(regex, () => htmlVal);
+                finalContent = finalContent.replace(variable.regex, () => htmlVal);
             }
-        });
 
-        // Since we changed promptOutput to a div, we use innerHTML for syntax highlighting
-        if (promptOutput.tagName === 'DIV') {
-            promptOutput.innerHTML = finalContent;
+            // Add any remaining text
+            const textAfter = finalContent.substring(lastIndex);
+            if (textAfter) {
+                promptOutput.appendChild(document.createTextNode(textAfter));
+            }
         } else {
-            promptOutput.value = finalContent; // Fallback if still a textarea somehow
+            // Fallback if still a textarea somehow
+            let plainTextContent = finalContent;
+            variables.forEach(variable => {
+                const input = document.getElementById(`input-${variable.raw}`);
+                const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
+
+                if (input && input.value.trim() !== '') {
+                    plainTextContent = plainTextContent.replace(replaceRegex, () => input.value);
+                }
+            });
+            promptOutput.value = plainTextContent;
         }
     }
 
     // Copy to Clipboard
     copyBtn.addEventListener('click', () => {
-        // Handle both div (textContent) and textarea (value)
-        const textToCopy = promptOutput.tagName === 'DIV' ? promptOutput.textContent : promptOutput.value;
+        const textToCopy = promptOutput.textContent;
 
         if (textToCopy) {
             navigator.clipboard.writeText(textToCopy).then(() => {
