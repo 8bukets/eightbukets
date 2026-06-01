@@ -205,13 +205,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
                 finalContent = finalContent.replace(regex, () => htmlVal);
             }
-        });
 
-        // Since we changed promptOutput to a div, we use innerHTML for syntax highlighting
-        if (promptOutput.tagName === 'DIV') {
-            promptOutput.innerHTML = finalContent;
+            // Add any remaining text
+            const textAfter = finalContent.substring(lastIndex);
+            if (textAfter) {
+                promptOutput.appendChild(document.createTextNode(textAfter));
+            }
         } else {
-            promptOutput.value = finalContent; // Fallback if still a textarea somehow
+            // Fallback if still a textarea somehow
+            let plainTextContent = finalContent;
+            variables.forEach(variable => {
+                const input = document.getElementById(`input-${variable.raw}`);
+                const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
+
+                if (input && input.value.trim() !== '') {
+                    plainTextContent = plainTextContent.replace(replaceRegex, () => input.value);
+                }
+            });
+            promptOutput.value = plainTextContent;
         }
     }
 
