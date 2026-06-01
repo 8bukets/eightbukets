@@ -16,6 +16,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentPrompt = null;
     let variables = [];
 
+    // Helper to escape HTML and prevent XSS
+    function escapeHTML(str) {
+        if (!str) return str;
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
     // Fetch JSON data
     try {
         const response = await fetch('prompts.json');
@@ -171,10 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let finalContent = currentPrompt.content;
 
         // Escape HTML to prevent XSS before doing custom highlighting
-        finalContent = finalContent
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+        finalContent = escapeHTML(finalContent);
 
         variables.forEach(variable => {
             const input = document.getElementById(`input-${variable.raw}`);
@@ -185,10 +191,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (input && input.value.trim() !== '') {
                 // Escape input to prevent XSS
-                let escapedVal = input.value
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;');
+                let escapedVal = escapeHTML(input.value);
                 const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
                 finalContent = finalContent.replace(regex, () => htmlVal);
             } else {
