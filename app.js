@@ -170,38 +170,64 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let finalContent = currentPrompt.content;
 
-        // Escape HTML to prevent XSS before doing custom highlighting
-        finalContent = finalContent
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-
-        variables.forEach(variable => {
-            const input = document.getElementById(`input-${variable.raw}`);
-
-            // We need to escape special characters in the variable name for the regex
-            const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            const regex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
-
-            if (input && input.value.trim() !== '') {
-                // Escape input to prevent XSS
-                let escapedVal = input.value
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;');
-                const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
-                finalContent = finalContent.replace(regex, () => htmlVal);
-            } else {
-                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
-                finalContent = finalContent.replace(regex, () => htmlVal);
-            }
-        });
-
-        // Since we changed promptOutput to a div, we use innerHTML for syntax highlighting
         if (promptOutput.tagName === 'DIV') {
-            promptOutput.innerHTML = finalContent;
+            promptOutput.textContent = ''; // Clear existing content
+
+            const regex = /\[(.*?)\]/g;
+            let lastIndex = 0;
+            let match;
+
+            while ((match = regex.exec(finalContent)) !== null) {
+                // Add text before the match
+                const textBefore = finalContent.substring(lastIndex, match.index);
+                if (textBefore) {
+                    promptOutput.appendChild(document.createTextNode(textBefore));
+                }
+
+                const rawVar = match[1];
+                const fullMatch = match[0];
+
+                // Find if this is one of our parsed variables
+                const variable = variables.find(v => v.raw === rawVar);
+
+                if (variable) {
+                    const input = document.getElementById(`input-${variable.raw}`);
+                    const span = document.createElement('span');
+
+                    if (input && input.value.trim() !== '') {
+                        span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
+                        span.textContent = input.value;
+                    } else {
+                        span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
+                        span.textContent = `[${variable.raw}]`;
+                    }
+                    promptOutput.appendChild(span);
+                } else {
+                    // Not a recognized variable, just add it as text
+                    promptOutput.appendChild(document.createTextNode(fullMatch));
+                }
+
+                lastIndex = regex.lastIndex;
+            }
+
+            // Add any remaining text
+            const textAfter = finalContent.substring(lastIndex);
+            if (textAfter) {
+                promptOutput.appendChild(document.createTextNode(textAfter));
+            }
         } else {
-            promptOutput.value = finalContent; // Fallback if still a textarea somehow
+            // Fallback if still a textarea somehow
+            let plainTextContent = finalContent;
+            variables.forEach(variable => {
+                const input = document.getElementById(`input-${variable.raw}`);
+                const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
+
+                if (input && input.value.trim() !== '') {
+                    plainTextContent = plainTextContent.replace(replaceRegex, () => input.value);
+                }
+            });
+            promptOutput.value = plainTextContent;
         }
     }
 
