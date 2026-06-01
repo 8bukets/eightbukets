@@ -6,3 +6,4 @@ test.js
 .gitignore
 user_prompt.txt
 existing_raw_data.txt
+__pycache__/
