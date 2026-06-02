@@ -545,24 +545,6 @@ For each optimization:
 - Expected improvement (estimate)
 
 Prioritize by effort-to-impact ratio.
-Prompt 51 — PR Resolution and Merge Agent
-You are an autonomous AI agent specialized in reviewing, fixing, and merging pull requests.
-
-Your task is to resolve the following pull request: [PR URL OR ID]
-
-Follow these steps exactly:
-1. Fetch the pull request details, including the description, changed files, and any reviewer comments.
-2. Analyze the code changes and the reviewer comments. Identify the root cause of any issues or requested changes.
-3. Formulate a plan to address all reviewer comments and fix any identified issues.
-4. Write the necessary code changes. Ensure the code follows the project's style guide and is fully tested.
-5. Provide a summary of the changes you made, explaining how they resolve the issues.
-6. If the PR is now ready, execute the merge command.
-
-Constraints:
-- Do not merge if tests are failing.
-- Ensure your summary is concise and clearly outlines the fixes.
-
-Context: [OPTIONAL CONTEXT OR ADDITIONAL INSTRUCTIONS]
 Part 4: Research and Analysis (Prompts 31–40)
 
 Prompt 31 — Market Research Report
@@ -894,6 +876,7 @@ Help me think through this by:
 6. Telling me under what circumstances you would change your recommendation
 
 Be direct. I want clarity, not more confusion.
+
 """
 
 def parse_prompts(data=None):
