@@ -82,3 +82,41 @@ describe('Prompts Library Error Handling', () => {
         consoleSpy.mockRestore();
     });
 });
+
+describe('escapeHTML Function', () => {
+    let escapeHTML;
+
+    beforeAll(() => {
+        // Require the app module to access the escapeHTML function
+        const app = require('./app.js');
+        escapeHTML = app.escapeHTML;
+    });
+
+    test('should return empty string or original value if falsy', () => {
+        expect(escapeHTML('')).toBe('');
+        expect(escapeHTML(null)).toBeNull();
+        expect(escapeHTML(undefined)).toBeUndefined();
+    });
+
+    test('should return original string if no HTML characters are present', () => {
+        expect(escapeHTML('hello world')).toBe('hello world');
+        expect(escapeHTML('12345')).toBe('12345');
+    });
+
+    test('should escape "&" to "&amp;"', () => {
+        expect(escapeHTML('AT&T')).toBe('AT&amp;T');
+        expect(escapeHTML('& & &')).toBe('&amp; &amp; &amp;');
+    });
+
+    test('should escape "<" to "&lt;"', () => {
+        expect(escapeHTML('<tag')).toBe('&lt;tag');
+    });
+
+    test('should escape ">" to "&gt;"', () => {
+        expect(escapeHTML('tag>')).toBe('tag&gt;');
+    });
+
+    test('should escape a combination of HTML characters', () => {
+        expect(escapeHTML('<script>alert("XSS & SQLi")</script>')).toBe('&lt;script&gt;alert("XSS &amp; SQLi")&lt;/script&gt;');
+    });
+});

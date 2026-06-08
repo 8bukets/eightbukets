@@ -253,6 +253,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+        escapeHTML,
         renderSidebar,
         selectPrompt,
         renderForm,
