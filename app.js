@@ -88,10 +88,14 @@ function parseVariables(content) {
             varHint = parts[1].trim();
         }
 
+        const escapedVariable = rawVar.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
+
         variables.push({
             raw: rawVar,
             name: varName,
-            hint: varHint
+            hint: varHint,
+            replaceRegex: replaceRegex
         });
     }
     return variables;
@@ -170,17 +174,15 @@ function updateOutput() {
         if (promptOutput.tagName === 'DIV') {
             variables.forEach(variable => {
                 const input = document.getElementById(`input-${variable.raw}`);
-                const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-                const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
 
                 if (input && input.value.trim() !== '') {
                     // Escape input to prevent XSS
                     let escapedVal = escapeHTML(input.value);
                     const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
-                    finalContent = finalContent.replace(replaceRegex, () => htmlVal);
+                    finalContent = finalContent.replace(variable.replaceRegex, () => htmlVal);
                 } else {
                     const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
-                    finalContent = finalContent.replace(replaceRegex, () => htmlVal);
+                    finalContent = finalContent.replace(variable.replaceRegex, () => htmlVal);
                 }
             });
             promptOutput.innerHTML = finalContent;
@@ -189,11 +191,9 @@ function updateOutput() {
             let plainTextContent = finalContent;
             variables.forEach(variable => {
                 const input = document.getElementById(`input-${variable.raw}`);
-                const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-                const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
 
                 if (input && input.value.trim() !== '') {
-                    plainTextContent = plainTextContent.replace(replaceRegex, () => input.value);
+                    plainTextContent = plainTextContent.replace(variable.replaceRegex, () => input.value);
                 }
             });
             promptOutput.value = plainTextContent;
@@ -255,6 +255,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         renderSidebar,
         selectPrompt,
+        parseVariables,
         renderForm,
         updateOutput,
         setPromptsData: (data) => promptsData = data,
