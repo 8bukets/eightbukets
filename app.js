@@ -22,8 +22,8 @@ function renderSidebar(categories, filterText = '') {
 
     categories.forEach(category => {
         const filteredPrompts = category.prompts.filter(prompt =>
-            prompt.title.toLowerCase().includes(filterTextLower) ||
-            prompt.content.toLowerCase().includes(filterTextLower)
+            prompt.titleLower.includes(filterTextLower) ||
+            prompt.contentLower.includes(filterTextLower)
         );
 
         if (filteredPrompts.length === 0) return;
@@ -218,6 +218,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         const response = await fetch('prompts.json');
         const data = await response.json();
+
+        // Pre-compute lowercase title and content for faster search filtering
+        data.categories.forEach(category => {
+            category.prompts.forEach(prompt => {
+                prompt.titleLower = prompt.title.toLowerCase();
+                prompt.contentLower = prompt.content.toLowerCase();
+            });
+        });
+
         promptsData = data.categories;
         renderSidebar(promptsData);
     } catch (error) {
