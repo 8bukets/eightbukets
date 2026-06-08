@@ -169,37 +169,22 @@ function updateOutput() {
     finalContent = escapeHTML(finalContent);
 
     if (promptOutput) {
-        if (promptOutput.tagName === 'DIV') {
-            variables.forEach(variable => {
-                const input = variable.inputElement;
-                const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-                const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
+        variables.forEach(variable => {
+            const input = document.getElementById(`input-${variable.raw}`);
+            const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
 
-                if (input && input.value.trim() !== '') {
-                    // Escape input to prevent XSS
-                    let escapedVal = escapeHTML(input.value);
-                    const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
-                    finalContent = finalContent.replace(replaceRegex, () => htmlVal);
-                } else {
-                    const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
-                    finalContent = finalContent.replace(replaceRegex, () => htmlVal);
-                }
-            });
-            promptOutput.innerHTML = finalContent;
-        } else {
-            // Fallback if still a textarea somehow
-            let plainTextContent = finalContent;
-            variables.forEach(variable => {
-                const input = variable.inputElement;
-                const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-                const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
-
-                if (input && input.value.trim() !== '') {
-                    plainTextContent = plainTextContent.replace(replaceRegex, () => input.value);
-                }
-            });
-            promptOutput.value = plainTextContent;
-        }
+            if (input && input.value.trim() !== '') {
+                // Escape input to prevent XSS
+                let escapedVal = escapeHTML(input.value);
+                const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
+                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
+            } else {
+                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
+                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
+            }
+        });
+        promptOutput.innerHTML = finalContent;
     }
 }
 
@@ -256,6 +241,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         renderSidebar,
+        parseVariables,
         selectPrompt,
         renderForm,
         updateOutput,
