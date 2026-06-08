@@ -82,3 +82,27 @@ describe('Prompts Library Error Handling', () => {
         consoleSpy.mockRestore();
     });
 });
+
+describe('Security Features', () => {
+    test('escapeHTML should properly escape all dangerous characters', () => {
+        let app;
+        jest.isolateModules(() => {
+            app = require('./app.js');
+        });
+
+        // Test escaping specific characters
+        expect(app.escapeHTML('<script>')).toBe('&lt;script&gt;');
+        expect(app.escapeHTML('AT&T')).toBe('AT&amp;T');
+        expect(app.escapeHTML('She said "Hello"')).toBe('She said &quot;Hello&quot;');
+        expect(app.escapeHTML("It's alive")).toBe('It&#39;s alive');
+
+        // Test combining multiple characters
+        expect(app.escapeHTML('<div class="test" onclick=\'alert(1)\'>&</div>'))
+            .toBe('&lt;div class=&quot;test&quot; onclick=&#39;alert(1)&#39;&gt;&amp;&lt;/div&gt;');
+
+        // Test edge cases
+        expect(app.escapeHTML('')).toBe('');
+        expect(app.escapeHTML(null)).toBe(null);
+        expect(app.escapeHTML(undefined)).toBe(undefined);
+    });
+});
