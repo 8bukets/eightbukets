@@ -90,10 +90,14 @@ function parseVariables(content) {
             varHint = parts[1].trim();
         }
 
+        const escapedVariable = rawVar.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
+
         variables.push({
             raw: rawVar,
             name: varName,
-            hint: varHint
+            hint: varHint,
+            replaceRegex: replaceRegex
         });
     }
     return variables;
