@@ -21,10 +21,12 @@ function renderSidebar(categories, filterText = '') {
     const filterTextLower = filterText.toLowerCase();
 
     categories.forEach(category => {
-        const filteredPrompts = category.prompts.filter(prompt =>
-            prompt.title.toLowerCase().includes(filterTextLower) ||
-            prompt.content.toLowerCase().includes(filterTextLower)
-        );
+        const filteredPrompts = category.prompts.filter(prompt => {
+            const titleTarget = prompt.titleLower !== undefined ? prompt.titleLower : prompt.title.toLowerCase();
+            const contentTarget = prompt.contentLower !== undefined ? prompt.contentLower : prompt.content.toLowerCase();
+
+            return titleTarget.includes(filterTextLower) || contentTarget.includes(filterTextLower);
+        });
 
         if (filteredPrompts.length === 0) return;
 
@@ -218,6 +220,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         const response = await fetch('prompts.json');
         const data = await response.json();
+
+        // Pre-compute lowercase strings for faster search filtering
+        data.categories.forEach(category => {
+            category.prompts.forEach(prompt => {
+                if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
+                if (prompt.content) prompt.contentLower = prompt.content.toLowerCase();
+            });
+        });
+
         promptsData = data.categories;
         renderSidebar(promptsData);
     } catch (error) {
