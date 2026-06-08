@@ -148,6 +148,8 @@ function renderForm() {
             input.rows = 2;
             input.placeholder = variable.hint ? `e.g. ${variable.hint}` : `Enter ${variable.name}...`;
 
+            variable.inputElement = input;
+
             input.addEventListener('input', updateOutput);
 
             div.appendChild(label);
