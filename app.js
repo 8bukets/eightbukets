@@ -176,9 +176,8 @@ function updateOutput() {
 
     if (promptOutput) {
         variables.forEach(variable => {
-            const input = document.getElementById(`input-${variable.raw}`);
-            const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
+            const input = variable.inputElement;
+            const replaceRegex = variable.replaceRegex;
 
             if (input && input.value.trim() !== '') {
                 // Escape input to prevent XSS
