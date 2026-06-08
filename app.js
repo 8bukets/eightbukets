@@ -148,6 +148,8 @@ function renderForm() {
             input.rows = 2;
             input.placeholder = variable.hint ? `e.g. ${variable.hint}` : `Enter ${variable.name}...`;
 
+            variable.inputElement = input;
+
             input.addEventListener('input', updateOutput);
 
             div.appendChild(label);
@@ -169,7 +171,7 @@ function updateOutput() {
     if (promptOutput) {
         if (promptOutput.tagName === 'DIV') {
             variables.forEach(variable => {
-                const input = document.getElementById(`input-${variable.raw}`);
+                const input = variable.inputElement;
                 const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
                 const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
 
@@ -188,7 +190,7 @@ function updateOutput() {
             // Fallback if still a textarea somehow
             let plainTextContent = finalContent;
             variables.forEach(variable => {
-                const input = document.getElementById(`input-${variable.raw}`);
+                const input = variable.inputElement;
                 const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
                 const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
 
