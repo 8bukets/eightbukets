@@ -83,30 +83,39 @@ describe('Prompts Library Error Handling', () => {
     });
 });
 
-describe('selectPrompt', () => {
-    let originalFetch;
+describe('renderSidebar', () => {
     let app;
+    let sidebarContent;
 
-    beforeAll(() => {
-        originalFetch = global.fetch;
-    });
-
-    afterAll(() => {
-        global.fetch = originalFetch;
-    });
+    const mockCategories = [
+        {
+            name: 'Category 1',
+            prompts: [
+                { id: '1', title: 'Prompt 1', content: 'Content 1 [VAR]' },
+                { id: '2', title: 'Prompt 2', content: 'Content 2' }
+            ]
+        },
+        {
+            name: 'Category 2',
+            prompts: [
+                { id: '3', title: 'Another Prompt', content: 'Something else' }
+            ]
+        }
+    ];
 
     beforeEach(() => {
-        const html = fs.readFileSync(path.resolve(__dirname, './index.html'), 'utf8');
-        document.documentElement.innerHTML = html.replace(/<!DOCTYPE html>/gi, '');
-        global.fetch = jest.fn().mockResolvedValue({
-            json: jest.fn().mockResolvedValue({ categories: [] })
-        });
+        // Load the HTML into JSDOM before each test to reset DOM
+        const html = fs.readFileSync(require('path').resolve(__dirname, './index.html'), 'utf8');
+        const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
+        document.documentElement.innerHTML = cleanHtml;
+
+        sidebarContent = document.getElementById('sidebar-content');
 
         jest.isolateModules(() => {
             app = require('./app.js');
         });
 
-        document.dispatchEvent(new Event('DOMContentLoaded'));
+        app.setSidebarContent(sidebarContent);
     });
 
     afterEach(() => {
@@ -114,66 +123,69 @@ describe('selectPrompt', () => {
         document.documentElement.innerHTML = '';
     });
 
-    test('updates UI correctly when a prompt is selected (happy path)', async () => {
-        await new Promise(process.nextTick);
+    test('renders all categories and prompts when no filter is provided', () => {
+        app.renderSidebar(mockCategories);
 
-        const prompt = {
-            id: 1,
-            title: 'Test Prompt',
-            content: 'Hello [WORLD]'
-        };
+        // Should render 2 categories
+        const categoryHeaders = sidebarContent.querySelectorAll('h3');
+        expect(categoryHeaders.length).toBe(2);
+        expect(categoryHeaders[0].textContent).toBe('Category 1');
+        expect(categoryHeaders[1].textContent).toBe('Category 2');
 
-        app.selectPrompt(prompt, 'Test Category');
-
-        // Check internal state
-        expect(app.getCurrentPrompt()).toBe(prompt);
-
-        // Check welcome message is hidden
-        const welcomeMessage = document.getElementById('welcome-message');
-        expect(welcomeMessage.classList.contains('hidden')).toBe(true);
-
-        // Check prompt workspace is visible
-        const promptWorkspace = document.getElementById('prompt-workspace');
-        expect(promptWorkspace.classList.contains('hidden')).toBe(false);
-        expect(promptWorkspace.classList.contains('flex')).toBe(true);
-
-        // Check category and title are updated
-        expect(document.getElementById('prompt-category').textContent).toBe('Test Category');
-        expect(document.getElementById('prompt-title').textContent).toBe('Test Prompt');
-
-        // Check that dynamic form is rendered for the variables
-        const dynamicForm = document.getElementById('dynamic-form');
-        expect(dynamicForm.innerHTML).toContain('WORLD');
-
-        // Check output is updated
-        const promptOutput = document.getElementById('prompt-output');
-        expect(promptOutput.innerHTML).toContain('Hello');
+        // Should render 3 prompts total
+        const promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
+        expect(promptButtons.length).toBe(3);
+        expect(promptButtons[0].textContent).toBe('Prompt 1');
+        expect(promptButtons[1].textContent).toBe('Prompt 2');
+        expect(promptButtons[2].textContent).toBe('Another Prompt');
     });
 
-    test('handles missing DOM elements safely (edge cases)', async () => {
-        await new Promise(process.nextTick);
+    test('filters prompts based on text in title or content', () => {
+        app.renderSidebar(mockCategories, 'something');
 
-        // Explicitly unset DOM references to simulate missing elements
-        app.setWelcomeMessage(null);
-        app.setPromptWorkspace(null);
-        app.setPromptCategory(null);
-        app.setPromptTitle(null);
-        app.setSearchInput(null);
-        app.setDynamicForm(null);
-        app.setPromptOutput(null);
+        // Only Category 2 has 'something' in content
+        const categoryHeaders = sidebarContent.querySelectorAll('h3');
+        expect(categoryHeaders.length).toBe(1);
+        expect(categoryHeaders[0].textContent).toBe('Category 2');
 
-        const prompt = {
-            id: 2,
-            title: 'Edge Case Prompt',
-            content: 'No variables here'
-        };
+        const promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
+        expect(promptButtons.length).toBe(1);
+        expect(promptButtons[0].textContent).toBe('Another Prompt');
 
-        // This should not throw an error despite null DOM elements
+        // Test filtering by title
+        app.renderSidebar(mockCategories, 'prompt 1');
+        const promptButtons2 = sidebarContent.querySelectorAll('.prompt-btn');
+        expect(promptButtons2.length).toBe(1);
+        expect(promptButtons2[0].textContent).toBe('Prompt 1');
+    });
+
+    test('does not throw when sidebarContent is null', () => {
+        app.setSidebarContent(null);
         expect(() => {
-            app.selectPrompt(prompt, 'Edge Cases');
+            app.renderSidebar(mockCategories);
         }).not.toThrow();
+    });
 
-        // State is still updated
-        expect(app.getCurrentPrompt()).toBe(prompt);
+    test('renders nothing when categories array is empty', () => {
+        app.renderSidebar([]);
+        expect(sidebarContent.innerHTML).toBe('');
+    });
+
+    test('highlights the currently selected prompt', () => {
+        app.setCurrentPrompt({ id: '2', title: 'Prompt 2', content: 'Content 2' });
+        app.renderSidebar(mockCategories);
+
+        const promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
+
+        // Prompt 1
+        expect(promptButtons[0].classList.contains('bg-indigo-100')).toBe(false);
+
+        // Prompt 2 (Selected)
+        expect(promptButtons[1].classList.contains('bg-indigo-100')).toBe(true);
+        expect(promptButtons[1].classList.contains('text-indigo-800')).toBe(true);
+        expect(promptButtons[1].classList.contains('font-semibold')).toBe(true);
+
+        // Prompt 3
+        expect(promptButtons[2].classList.contains('bg-indigo-100')).toBe(false);
     });
 });

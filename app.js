@@ -21,10 +21,12 @@ function renderSidebar(categories, filterText = '') {
     const filterTextLower = filterText.toLowerCase();
 
     categories.forEach(category => {
-        const filteredPrompts = category.prompts.filter(prompt =>
-            prompt.title.toLowerCase().includes(filterTextLower) ||
-            prompt.content.toLowerCase().includes(filterTextLower)
-        );
+        const filteredPrompts = category.prompts.filter(prompt => {
+            const titleTarget = prompt.titleLower !== undefined ? prompt.titleLower : prompt.title.toLowerCase();
+            const contentTarget = prompt.contentLower !== undefined ? prompt.contentLower : prompt.content.toLowerCase();
+
+            return titleTarget.includes(filterTextLower) || contentTarget.includes(filterTextLower);
+        });
 
         if (filteredPrompts.length === 0) return;
 
@@ -148,6 +150,8 @@ function renderForm() {
             input.rows = 2;
             input.placeholder = variable.hint ? `e.g. ${variable.hint}` : `Enter ${variable.name}...`;
 
+            variable.inputElement = input;
+
             input.addEventListener('input', updateOutput);
 
             div.appendChild(label);
@@ -167,37 +171,22 @@ function updateOutput() {
     finalContent = escapeHTML(finalContent);
 
     if (promptOutput) {
-        if (promptOutput.tagName === 'DIV') {
-            variables.forEach(variable => {
-                const input = document.getElementById(`input-${variable.raw}`);
-                const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-                const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
+        variables.forEach(variable => {
+            const input = document.getElementById(`input-${variable.raw}`);
+            const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
 
-                if (input && input.value.trim() !== '') {
-                    // Escape input to prevent XSS
-                    let escapedVal = escapeHTML(input.value);
-                    const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
-                    finalContent = finalContent.replace(replaceRegex, () => htmlVal);
-                } else {
-                    const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
-                    finalContent = finalContent.replace(replaceRegex, () => htmlVal);
-                }
-            });
-            promptOutput.innerHTML = finalContent;
-        } else {
-            // Fallback if still a textarea somehow
-            let plainTextContent = finalContent;
-            variables.forEach(variable => {
-                const input = document.getElementById(`input-${variable.raw}`);
-                const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-                const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
-
-                if (input && input.value.trim() !== '') {
-                    plainTextContent = plainTextContent.replace(replaceRegex, () => input.value);
-                }
-            });
-            promptOutput.value = plainTextContent;
-        }
+            if (input && input.value.trim() !== '') {
+                // Escape input to prevent XSS
+                let escapedVal = escapeHTML(input.value);
+                const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
+                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
+            } else {
+                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
+                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
+            }
+        });
+        promptOutput.innerHTML = finalContent;
     }
 }
 
@@ -218,6 +207,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         const response = await fetch('prompts.json');
         const data = await response.json();
+
+        // Pre-compute lowercase strings for faster search filtering
+        data.categories.forEach(category => {
+            category.prompts.forEach(prompt => {
+                if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
+                if (prompt.content) prompt.contentLower = prompt.content.toLowerCase();
+            });
+        });
+
         promptsData = data.categories;
         renderSidebar(promptsData);
     } catch (error) {
@@ -254,6 +252,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         renderSidebar,
+        parseVariables,
         selectPrompt,
         renderForm,
         updateOutput,
