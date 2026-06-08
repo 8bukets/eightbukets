@@ -82,3 +82,98 @@ describe('Prompts Library Error Handling', () => {
         consoleSpy.mockRestore();
     });
 });
+
+describe('selectPrompt', () => {
+    let originalFetch;
+    let app;
+
+    beforeAll(() => {
+        originalFetch = global.fetch;
+    });
+
+    afterAll(() => {
+        global.fetch = originalFetch;
+    });
+
+    beforeEach(() => {
+        const html = fs.readFileSync(path.resolve(__dirname, './index.html'), 'utf8');
+        document.documentElement.innerHTML = html.replace(/<!DOCTYPE html>/gi, '');
+        global.fetch = jest.fn().mockResolvedValue({
+            json: jest.fn().mockResolvedValue({ categories: [] })
+        });
+
+        jest.isolateModules(() => {
+            app = require('./app.js');
+        });
+
+        document.dispatchEvent(new Event('DOMContentLoaded'));
+    });
+
+    afterEach(() => {
+        jest.resetModules();
+        document.documentElement.innerHTML = '';
+    });
+
+    test('updates UI correctly when a prompt is selected (happy path)', async () => {
+        await new Promise(process.nextTick);
+
+        const prompt = {
+            id: 1,
+            title: 'Test Prompt',
+            content: 'Hello [WORLD]'
+        };
+
+        app.selectPrompt(prompt, 'Test Category');
+
+        // Check internal state
+        expect(app.getCurrentPrompt()).toBe(prompt);
+
+        // Check welcome message is hidden
+        const welcomeMessage = document.getElementById('welcome-message');
+        expect(welcomeMessage.classList.contains('hidden')).toBe(true);
+
+        // Check prompt workspace is visible
+        const promptWorkspace = document.getElementById('prompt-workspace');
+        expect(promptWorkspace.classList.contains('hidden')).toBe(false);
+        expect(promptWorkspace.classList.contains('flex')).toBe(true);
+
+        // Check category and title are updated
+        expect(document.getElementById('prompt-category').textContent).toBe('Test Category');
+        expect(document.getElementById('prompt-title').textContent).toBe('Test Prompt');
+
+        // Check that dynamic form is rendered for the variables
+        const dynamicForm = document.getElementById('dynamic-form');
+        expect(dynamicForm.innerHTML).toContain('WORLD');
+
+        // Check output is updated
+        const promptOutput = document.getElementById('prompt-output');
+        expect(promptOutput.innerHTML).toContain('Hello');
+    });
+
+    test('handles missing DOM elements safely (edge cases)', async () => {
+        await new Promise(process.nextTick);
+
+        // Explicitly unset DOM references to simulate missing elements
+        app.setWelcomeMessage(null);
+        app.setPromptWorkspace(null);
+        app.setPromptCategory(null);
+        app.setPromptTitle(null);
+        app.setSearchInput(null);
+        app.setDynamicForm(null);
+        app.setPromptOutput(null);
+
+        const prompt = {
+            id: 2,
+            title: 'Edge Case Prompt',
+            content: 'No variables here'
+        };
+
+        // This should not throw an error despite null DOM elements
+        expect(() => {
+            app.selectPrompt(prompt, 'Edge Cases');
+        }).not.toThrow();
+
+        // State is still updated
+        expect(app.getCurrentPrompt()).toBe(prompt);
+    });
+});
