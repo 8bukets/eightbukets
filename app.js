@@ -65,6 +65,9 @@ function renderSidebar(categories, filterText = '') {
     });
 }
 
+// Pre-compile RegExp to avoid recreation inside loops
+const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
+
 function parseVariables(content) {
     const regex = /\[(.*?)\]/g;
     variables = [];
@@ -90,7 +93,7 @@ function parseVariables(content) {
             varHint = parts[1].trim();
         }
 
-        const escapedVariable = rawVar.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
         const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
 
         variables.push({
