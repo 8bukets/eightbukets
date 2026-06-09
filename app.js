@@ -162,6 +162,9 @@ function renderForm() {
 
             input.addEventListener('input', updateOutput);
 
+            // Cache the input element on the variable
+            variable.inputElement = input;
+
             div.appendChild(label);
             div.appendChild(input);
             dynamicForm.appendChild(div);
