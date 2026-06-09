@@ -82,3 +82,110 @@ describe('Prompts Library Error Handling', () => {
         consoleSpy.mockRestore();
     });
 });
+
+describe('renderSidebar', () => {
+    let app;
+    let sidebarContent;
+
+    const mockCategories = [
+        {
+            name: 'Category 1',
+            prompts: [
+                { id: '1', title: 'Prompt 1', content: 'Content 1 [VAR]', titleLower: 'prompt 1', contentLower: 'content 1 [var]' },
+                { id: '2', title: 'Prompt 2', content: 'Content 2', titleLower: 'prompt 2', contentLower: 'content 2' }
+            ]
+        },
+        {
+            name: 'Category 2',
+            prompts: [
+                { id: '3', title: 'Another Prompt', content: 'Something else', titleLower: 'another prompt', contentLower: 'something else' }
+            ]
+        }
+    ];
+
+    beforeEach(() => {
+        // Load the HTML into JSDOM before each test to reset DOM
+        const html = fs.readFileSync(require('path').resolve(__dirname, './index.html'), 'utf8');
+        const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
+        document.documentElement.innerHTML = cleanHtml;
+
+        sidebarContent = document.getElementById('sidebar-content');
+
+        jest.isolateModules(() => {
+            app = require('./app.js');
+        });
+
+        app.setSidebarContent(sidebarContent);
+    });
+
+    afterEach(() => {
+        jest.resetModules();
+        document.documentElement.innerHTML = '';
+    });
+
+    test('renders all categories and prompts when no filter is provided', () => {
+        app.renderSidebar(mockCategories);
+
+        // Should render 2 categories
+        const categoryHeaders = sidebarContent.querySelectorAll('h3');
+        expect(categoryHeaders.length).toBe(2);
+        expect(categoryHeaders[0].textContent).toBe('Category 1');
+        expect(categoryHeaders[1].textContent).toBe('Category 2');
+
+        // Should render 3 prompts total
+        const promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
+        expect(promptButtons.length).toBe(3);
+        expect(promptButtons[0].textContent).toBe('Prompt 1');
+        expect(promptButtons[1].textContent).toBe('Prompt 2');
+        expect(promptButtons[2].textContent).toBe('Another Prompt');
+    });
+
+    test('filters prompts based on text in title or content', () => {
+        app.renderSidebar(mockCategories, 'something');
+
+        // Only Category 2 has 'something' in content
+        const categoryHeaders = sidebarContent.querySelectorAll('h3');
+        expect(categoryHeaders.length).toBe(1);
+        expect(categoryHeaders[0].textContent).toBe('Category 2');
+
+        const promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
+        expect(promptButtons.length).toBe(1);
+        expect(promptButtons[0].textContent).toBe('Another Prompt');
+
+        // Test filtering by title
+        app.renderSidebar(mockCategories, 'prompt 1');
+        const promptButtons2 = sidebarContent.querySelectorAll('.prompt-btn');
+        expect(promptButtons2.length).toBe(1);
+        expect(promptButtons2[0].textContent).toBe('Prompt 1');
+    });
+
+    test('does not throw when sidebarContent is null', () => {
+        app.setSidebarContent(null);
+        expect(() => {
+            app.renderSidebar(mockCategories);
+        }).not.toThrow();
+    });
+
+    test('renders nothing when categories array is empty', () => {
+        app.renderSidebar([]);
+        expect(sidebarContent.innerHTML).toBe('');
+    });
+
+    test('highlights the currently selected prompt', () => {
+        app.setCurrentPrompt({ id: '2', title: 'Prompt 2', content: 'Content 2' });
+        app.renderSidebar(mockCategories);
+
+        const promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
+
+        // Prompt 1
+        expect(promptButtons[0].classList.contains('bg-indigo-100')).toBe(false);
+
+        // Prompt 2 (Selected)
+        expect(promptButtons[1].classList.contains('bg-indigo-100')).toBe(true);
+        expect(promptButtons[1].classList.contains('text-indigo-800')).toBe(true);
+        expect(promptButtons[1].classList.contains('font-semibold')).toBe(true);
+
+        // Prompt 3
+        expect(promptButtons[2].classList.contains('bg-indigo-100')).toBe(false);
+    });
+});
