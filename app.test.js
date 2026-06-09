@@ -91,14 +91,14 @@ describe('renderSidebar', () => {
         {
             name: 'Category 1',
             prompts: [
-                { id: '1', title: 'Prompt 1', content: 'Content 1 [VAR]' },
-                { id: '2', title: 'Prompt 2', content: 'Content 2' }
+                { id: '1', title: 'Prompt 1', content: 'Content 1 [VAR]', titleLower: 'prompt 1', contentLower: 'content 1 [var]' },
+                { id: '2', title: 'Prompt 2', content: 'Content 2', titleLower: 'prompt 2', contentLower: 'content 2' }
             ]
         },
         {
             name: 'Category 2',
             prompts: [
-                { id: '3', title: 'Another Prompt', content: 'Something else' }
+                { id: '3', title: 'Another Prompt', content: 'Something else', titleLower: 'another prompt', contentLower: 'something else' }
             ]
         }
     ];

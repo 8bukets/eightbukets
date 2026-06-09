@@ -22,10 +22,9 @@ function renderSidebar(categories, filterText = '') {
 
     categories.forEach(category => {
         const filteredPrompts = category.prompts.filter(prompt => {
-            const titleTarget = prompt.titleLower !== undefined ? prompt.titleLower : prompt.title.toLowerCase();
-            const contentTarget = prompt.contentLower !== undefined ? prompt.contentLower : prompt.content.toLowerCase();
-
-            return titleTarget.includes(filterTextLower) || contentTarget.includes(filterTextLower);
+            // Strictly use pre-computed lowercase fields to avoid repeated string manipulation
+            // and fallback to empty string if missing to avoid throwing and maintain performance
+            return (prompt.titleLower || '').includes(filterTextLower) || (prompt.contentLower || '').includes(filterTextLower);
         });
 
         if (filteredPrompts.length === 0) return;
