@@ -876,8 +876,6 @@ Help me think through this by:
 6. Telling me under what circumstances you would change your recommendation
 
 Be direct. I want clarity, not more confusion.
-How to Get Maximum Value From This Collection
-
 """
 
 def parse_prompts(data=None):
