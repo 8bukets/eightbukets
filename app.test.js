@@ -83,6 +83,38 @@ describe('Prompts Library Error Handling', () => {
     });
 });
 
+describe('escapeHTML', () => {
+    let app;
+
+    beforeEach(() => {
+        jest.isolateModules(() => {
+            app = require('./app.js');
+        });
+    });
+
+    test('should return empty string or null/undefined if passed', () => {
+        expect(app.escapeHTML('')).toBe('');
+        expect(app.escapeHTML(null)).toBe(null);
+        expect(app.escapeHTML(undefined)).toBe(undefined);
+    });
+
+    test('should escape basic HTML characters (<, >, &)', () => {
+        expect(app.escapeHTML('<div>&</div>')).toBe('&lt;div&gt;&amp;&lt;/div&gt;');
+    });
+
+    test('should escape single and double quotes to prevent XSS in attributes', () => {
+        expect(app.escapeHTML(`"hello" 'world'`)).toBe('&quot;hello&quot; &#39;world&#39;');
+    });
+
+    test('should mitigate specific XSS payloads', () => {
+        const payload1 = '<img src="x" onerror="alert(1)">';
+        expect(app.escapeHTML(payload1)).toBe('&lt;img src=&quot;x&quot; onerror=&quot;alert(1)&quot;&gt;');
+
+        const payload2 = `<div onclick='alert(1)'>Click</div>`;
+        expect(app.escapeHTML(payload2)).toBe('&lt;div onclick=&#39;alert(1)&#39;&gt;Click&lt;/div&gt;');
+    });
+});
+
 describe('renderSidebar', () => {
     let app;
     let sidebarContent;

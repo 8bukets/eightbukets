@@ -10,7 +10,9 @@ function escapeHTML(str) {
     return str
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&#39;')
+        .replace(/"/g, '&quot;');
 }
 
 // Render Sidebar
@@ -255,6 +257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+        escapeHTML,
         renderSidebar,
         parseVariables,
         selectPrompt,
