@@ -4,43 +4,43 @@ describe('parseVariables function', () => {
     test('should extract a basic variable without hint', () => {
         const result = parseVariables("This is a [TOPIC] prompt.");
         expect(result).toEqual([
-            { raw: 'TOPIC', name: 'TOPIC', hint: '' }
+            { raw: 'TOPIC', name: 'TOPIC', hint: '', replaceRegex: /\[TOPIC\]/g }
         ]);
     });
 
     test('should extract multiple basic variables', () => {
         const result = parseVariables("A [TOPIC] for [AUDIENCE].");
         expect(result).toEqual([
-            { raw: 'TOPIC', name: 'TOPIC', hint: '' },
-            { raw: 'AUDIENCE', name: 'AUDIENCE', hint: '' }
+            { raw: 'TOPIC', name: 'TOPIC', hint: '', replaceRegex: /\[TOPIC\]/g },
+            { raw: 'AUDIENCE', name: 'AUDIENCE', hint: '', replaceRegex: /\[AUDIENCE\]/g }
         ]);
     });
 
     test('should deduplicate identical variables', () => {
         const result = parseVariables("A [TOPIC] prompt about the same [TOPIC].");
         expect(result).toEqual([
-            { raw: 'TOPIC', name: 'TOPIC', hint: '' }
+            { raw: 'TOPIC', name: 'TOPIC', hint: '', replaceRegex: /\[TOPIC\]/g }
         ]);
     });
 
     test('should extract variable name and hint separated by colon', () => {
         const result = parseVariables("Write about [TOPIC: Data Science].");
         expect(result).toEqual([
-            { raw: 'TOPIC: Data Science', name: 'TOPIC', hint: 'Data Science' }
+            { raw: 'TOPIC: Data Science', name: 'TOPIC', hint: 'Data Science', replaceRegex: /\[TOPIC: Data Science\]/g }
         ]);
     });
 
     test('should extract variable name and hint separated by em-dash', () => {
         const result = parseVariables("Write about [TOPIC — Data Science].");
         expect(result).toEqual([
-            { raw: 'TOPIC — Data Science', name: 'TOPIC', hint: 'Data Science' }
+            { raw: 'TOPIC — Data Science', name: 'TOPIC', hint: 'Data Science', replaceRegex: /\[TOPIC — Data Science\]/g }
         ]);
     });
 
     test('should handle empty brackets correctly', () => {
         const result = parseVariables("This is an empty [] bracket.");
         expect(result).toEqual([
-            { raw: '', name: '', hint: '' }
+            { raw: '', name: '', hint: '', replaceRegex: /\[\]/g }
         ]);
     });
 
@@ -53,10 +53,10 @@ describe('parseVariables function', () => {
         const content = "Prompt: [ACTION: Write] a [FORMAT — Blog Post] about [TOPIC] for [AUDIENCE] which will be a [FORMAT — Blog Post].";
         const result = parseVariables(content);
         expect(result).toEqual([
-            { raw: 'ACTION: Write', name: 'ACTION', hint: 'Write' },
-            { raw: 'FORMAT — Blog Post', name: 'FORMAT', hint: 'Blog Post' },
-            { raw: 'TOPIC', name: 'TOPIC', hint: '' },
-            { raw: 'AUDIENCE', name: 'AUDIENCE', hint: '' }
+            { raw: 'ACTION: Write', name: 'ACTION', hint: 'Write', replaceRegex: /\[ACTION: Write\]/g },
+            { raw: 'FORMAT — Blog Post', name: 'FORMAT', hint: 'Blog Post', replaceRegex: /\[FORMAT — Blog Post\]/g },
+            { raw: 'TOPIC', name: 'TOPIC', hint: '', replaceRegex: /\[TOPIC\]/g },
+            { raw: 'AUDIENCE', name: 'AUDIENCE', hint: '', replaceRegex: /\[AUDIENCE\]/g }
         ]);
     });
 });
