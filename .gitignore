@@ -5,3 +5,4 @@ test.js
 user_prompt.txt
 existing_raw_data.txt
 __pycache__/
+coverage/
