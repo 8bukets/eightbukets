@@ -200,6 +200,7 @@ function updateOutput() {
     }
 }
 
+if (typeof document !== 'undefined') {
 document.addEventListener('DOMContentLoaded', async () => {
     sidebarContent = document.getElementById('sidebar-content');
     searchInput = document.getElementById('search-input');
@@ -258,6 +259,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 });
+}
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {

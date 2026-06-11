@@ -1,3 +1,5 @@
+const { escapeHTML } = require('./app.js');
+
 const iterations = 100000;
 
 // Mock data
@@ -18,10 +20,7 @@ const mockInputs = {
 function originalUpdateOutput() {
     let finalContent = promptContent;
 
-    finalContent = finalContent
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+    finalContent = escapeHTML(finalContent);
 
     variables.forEach(variable => {
         const escapedVariable = variable.raw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
@@ -29,10 +28,7 @@ function originalUpdateOutput() {
 
         const val = mockInputs[variable.raw];
         if (val) {
-            let escapedVal = val
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
+            let escapedVal = escapeHTML(val);
             const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
             finalContent = finalContent.replace(regex, () => htmlVal);
         } else {
@@ -47,10 +43,7 @@ function originalUpdateOutput() {
 function optimizedUpdateOutput() {
     let finalContent = promptContent;
 
-    finalContent = finalContent
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+    finalContent = escapeHTML(finalContent);
 
     variables.forEach(variable => {
         // Cache the regex on the variable if not present
@@ -61,10 +54,7 @@ function optimizedUpdateOutput() {
 
         const val = mockInputs[variable.raw];
         if (val) {
-            let escapedVal = val
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
+            let escapedVal = escapeHTML(val);
             const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
             finalContent = finalContent.replace(variable.regex, () => htmlVal);
         } else {
