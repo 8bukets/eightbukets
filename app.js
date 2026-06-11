@@ -94,14 +94,10 @@ function parseVariables(content) {
             varHint = parts[1].trim();
         }
 
-        const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-        const replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
-
         variables.push({
             raw: rawVar,
             name: varName,
-            hint: varHint,
-            replaceRegex: replaceRegex
+            hint: varHint
         });
     }
     return variables;
@@ -184,6 +180,11 @@ function updateOutput() {
     if (promptOutput) {
         variables.forEach(variable => {
             const input = variable.inputElement;
+
+            if (!variable.replaceRegex) {
+                const escapedVariable = variable.raw.replace(ESCAPE_REGEX, '\\$&');
+                variable.replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
+            }
             const replaceRegex = variable.replaceRegex;
 
             if (input && input.value.trim() !== '') {
