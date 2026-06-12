@@ -94,10 +94,12 @@ function parseVariables(content) {
             varHint = parts[1].trim();
         }
 
+        const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
         variables.push({
             raw: rawVar,
             name: varName,
-            hint: varHint
+            hint: varHint,
+            replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
         });
     }
     return variables;
@@ -181,10 +183,6 @@ function updateOutput() {
         variables.forEach(variable => {
             const input = variable.inputElement;
 
-            if (!variable.replaceRegex) {
-                const escapedVariable = variable.raw.replace(ESCAPE_REGEX, '\\$&');
-                variable.replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
-            }
             const replaceRegex = variable.replaceRegex;
 
             if (input && input.value.trim() !== '') {
@@ -197,10 +195,25 @@ function updateOutput() {
                 finalContent = finalContent.replace(replaceRegex, () => htmlVal);
             }
         });
-        promptOutput.innerHTML = finalContent;
+        if (promptOutput.tagName === 'TEXTAREA') {
+            // Revert escaped HTML characters in textarea value
+            promptOutput.value = finalContent
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&#39;/g, "'")
+                .replace(/&quot;/g, '"');
+            // Remove the span tags that were added for DIV formatting
+            promptOutput.value = promptOutput.value
+                .replace(/<span class="[^"]*">/g, '')
+                .replace(/<\/span>/g, '');
+        } else {
+            promptOutput.innerHTML = finalContent;
+        }
     }
 }
 
+if (typeof document !== 'undefined') {
 document.addEventListener('DOMContentLoaded', async () => {
     sidebarContent = document.getElementById('sidebar-content');
     searchInput = document.getElementById('search-input');
@@ -259,6 +272,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 });
+}
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
