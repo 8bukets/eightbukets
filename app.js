@@ -156,12 +156,10 @@ function renderForm() {
             input.rows = 2;
             input.placeholder = variable.hint ? `e.g. ${variable.hint}` : `Enter ${variable.name}...`;
 
+            // Cache the input element directly on the variable object to avoid repeated DOM queries in loops
             variable.inputElement = input;
 
             input.addEventListener('input', updateOutput);
-
-            // Cache the input element on the variable
-            variable.inputElement = input;
 
             div.appendChild(label);
             div.appendChild(input);
