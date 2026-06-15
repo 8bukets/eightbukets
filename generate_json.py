@@ -1,10 +1,21 @@
 import json
-import os
+from pathlib import Path
 import re
 
-def parse_prompts(data=None):
+def parse_prompts(data=None, filename='prompts.txt'):
     if data is None:
-        filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prompts.txt')
+        base_dir = Path(__file__).resolve().parent
+        filepath = (base_dir / filename).resolve()
+
+        # Security check: Ensure the resolved path is within the base directory to prevent path traversal
+        try:
+            filepath.relative_to(base_dir)
+        except ValueError:
+            raise PermissionError(f"Access denied: Path traversal detected for {filename}")
+
+        if not filepath.is_file():
+            raise FileNotFoundError(f"File not found: {filepath}")
+
         with open(filepath, 'r', encoding='utf-8') as f:
             data = f.read()
 
