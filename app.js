@@ -71,7 +71,7 @@ const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 
 function parseVariables(content) {
     const regex = /\[(.*?)\]/g;
-    variables = [];
+    const localVariables = [];
     const seenVars = new Set();
     let match;
 
@@ -95,14 +95,23 @@ function parseVariables(content) {
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-        variables.push({
+        localVariables.push({
             raw: rawVar,
             name: varName,
             hint: varHint,
             replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
         });
     }
-    return variables;
+
+    // Pre-compile a single regex that matches all unique variables
+    if (localVariables.length > 0) {
+        const pattern = localVariables.map(v => v.raw.replace(ESCAPE_REGEX, '\\$&')).join('|');
+        localVariables.masterRegex = new RegExp(`\\[(${pattern})\\]`, 'g');
+    } else {
+        localVariables.masterRegex = null;
+    }
+
+    return localVariables;
 }
 
 // Select a prompt
@@ -170,44 +179,57 @@ function renderForm() {
 
 // Update Textarea Output
 function updateOutput() {
-    if (!currentPrompt) return;
+    if (!currentPrompt || !promptOutput) return;
 
-    let finalContent = currentPrompt.content;
+    const isTextarea = promptOutput.tagName === 'TEXTAREA';
+    const content = currentPrompt.content;
+    const masterRegex = variables.masterRegex;
 
-    // Escape HTML to prevent XSS before doing custom highlighting
-    finalContent = escapeHTML(finalContent);
-
-    if (promptOutput) {
-        variables.forEach(variable => {
-            const input = variable.inputElement;
-
-            const replaceRegex = variable.replaceRegex;
-
-            if (input && input.value.trim() !== '') {
-                // Escape input to prevent XSS
-                let escapedVal = escapeHTML(input.value);
-                const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
-                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
-            } else {
-                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
-                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
-            }
-        });
-        if (promptOutput.tagName === 'TEXTAREA') {
-            // Revert escaped HTML characters in textarea value
-            promptOutput.value = finalContent
-                .replace(/&amp;/g, '&')
-                .replace(/&lt;/g, '<')
-                .replace(/&gt;/g, '>')
-                .replace(/&#39;/g, "'")
-                .replace(/&quot;/g, '"');
-            // Remove the span tags that were added for DIV formatting
-            promptOutput.value = promptOutput.value
-                .replace(/<span class="[^"]*">/g, '')
-                .replace(/<\/span>/g, '');
+    if (!masterRegex) {
+        if (isTextarea) {
+            promptOutput.value = content;
         } else {
-            promptOutput.innerHTML = finalContent;
+            promptOutput.innerHTML = escapeHTML(content);
         }
+        return;
+    }
+
+    // Optimization: Pre-map variables for faster lookup
+    if (!variables._map) {
+        variables._map = new Map(variables.map(v => [v.raw, v]));
+    }
+
+    if (isTextarea) {
+        promptOutput.value = content.replace(masterRegex, (match, raw) => {
+            const variable = variables._map.get(raw);
+            const input = variable.inputElement;
+            return (input && input.value.trim() !== '') ? input.value : `[${raw}]`;
+        });
+    } else {
+        // For HTML output, we need to escape the static parts and the input values
+        // We split the content by the regex to get static parts
+        const parts = content.split(masterRegex);
+        // content.split(masterRegex) with a capturing group returns [static, captured, static, captured, ...]
+        let htmlResult = "";
+        for (let i = 0; i < parts.length; i++) {
+            if (i % 2 === 0) {
+                // Static part
+                htmlResult += escapeHTML(parts[i]);
+            } else {
+                // Variable part (captured raw name)
+                const raw = parts[i];
+                const variable = variables._map.get(raw);
+                const input = variable.inputElement;
+
+                if (input && input.value.trim() !== '') {
+                    const escapedVal = escapeHTML(input.value);
+                    htmlResult += `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
+                } else {
+                    htmlResult += `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${escapeHTML(raw)}]</span>`;
+                }
+            }
+        }
+        promptOutput.innerHTML = htmlResult;
     }
 }
 
@@ -278,7 +300,6 @@ if (typeof module !== 'undefined' && module.exports) {
         renderSidebar,
         parseVariables,
         selectPrompt,
-        parseVariables,
         renderForm,
         updateOutput,
         setPromptsData: (data) => promptsData = data,
