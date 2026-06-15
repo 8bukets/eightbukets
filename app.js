@@ -285,7 +285,6 @@ if (typeof module !== 'undefined' && module.exports) {
         renderSidebar,
         parseVariables,
         selectPrompt,
-        parseVariables,
         renderForm,
         updateOutput,
         setPromptsData: (data) => promptsData = data,
