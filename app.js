@@ -12,27 +12,6 @@ const HTML_ESCAPE_MAP = {
     "'": '&#39;',
     '"': '&quot;'
 };
-const HTML_ESCAPE_CHECK_REGEX = /[&<>'"]/;
-const HTML_ESCAPE_REGEX = /[&<>'"]/g;
-
-const ENTITY_MAP = {
-    '&amp;': '&',
-    '&lt;': '<',
-    '&gt;': '>',
-    '&#39;': "'",
-    '&quot;': '"'
-};
-const REVERT_ENTITIES_REGEX = /&amp;|&lt;|&gt;|&#39;|&quot;/g;
-const REVERT_SPANS_REGEX = /<span class="[^"]*">|<\/span>/g;
-
-// Helper to escape HTML and prevent XSS
-const HTML_ESCAPE_MAP = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    "'": '&#39;',
-    '"': '&quot;'
-};
 const HTML_ESCAPE_REGEX = /[&<>'"]/g;
 
 function escapeHTML(str) {
@@ -44,18 +23,26 @@ function escapeHTML(str) {
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
-    sidebarContent.innerHTML = '';
+    sidebarContent.textContent = '';
 
     const filterTextLower = filterText.toLowerCase();
+    const fragment = document.createDocumentFragment();
 
-    categories.forEach(category => {
-        const filteredPrompts = category.prompts.filter(prompt => {
-            // Strictly use pre-computed lowercase fields to avoid repeated string manipulation
-            // and fallback to empty string if missing to avoid throwing and maintain performance
-            return (prompt.titleLower || '').includes(filterTextLower) || (prompt.contentLower || '').includes(filterTextLower);
-        });
+    const categoriesLength = categories.length;
+    for (let i = 0; i < categoriesLength; i++) {
+        const category = categories[i];
+        const prompts = category.prompts;
+        const promptsLength = prompts.length;
+        const filteredPrompts = [];
 
-        if (filteredPrompts.length === 0) return;
+        for (let j = 0; j < promptsLength; j++) {
+            const prompt = prompts[j];
+            if ((prompt.titleLower || '').includes(filterTextLower) || (prompt.contentLower || '').includes(filterTextLower)) {
+                filteredPrompts.push(prompt);
+            }
+        }
+
+        if (filteredPrompts.length === 0) continue;
 
         const categoryDiv = document.createElement('div');
         categoryDiv.className = 'mb-6';
@@ -68,28 +55,31 @@ function renderSidebar(categories, filterText = '') {
         const promptList = document.createElement('ul');
         promptList.className = 'space-y-1';
 
-        filteredPrompts.forEach(prompt => {
+        const filteredLength = filteredPrompts.length;
+        for (let j = 0; j < filteredLength; j++) {
+            const prompt = filteredPrompts[j];
             const li = document.createElement('li');
             const btn = document.createElement('button');
-            btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate';
 
-            // Add highlighting if this is the currently selected prompt
-            if (currentPrompt && currentPrompt.id === prompt.id) {
-                btn.classList.add('bg-indigo-100', 'text-indigo-800', 'font-semibold');
-            } else {
-                btn.classList.add('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-700');
-            }
+            const isSelected = currentPrompt && currentPrompt.id === prompt.id;
+            btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate' +
+                (isSelected ? ' bg-indigo-100 text-indigo-800 font-semibold' : ' text-gray-700 hover:bg-indigo-50 hover:text-indigo-700');
 
             btn.textContent = prompt.title;
-            btn.onclick = () => selectPrompt(prompt, category.name);
+
+            // Store data for event delegation
+            btn.dataset.promptId = prompt.id;
+            btn.dataset.categoryName = category.name;
 
             li.appendChild(btn);
             promptList.appendChild(li);
-        });
+        }
 
         categoryDiv.appendChild(promptList);
-        sidebarContent.appendChild(categoryDiv);
-    });
+        fragment.appendChild(categoryDiv);
+    }
+
+    sidebarContent.appendChild(fragment);
 }
 
 // Pre-compile RegExp to avoid recreation inside loops
@@ -250,27 +240,16 @@ function updateOutput() {
                 span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
                 span.textContent = input.value;
             } else {
-                let escapedRaw = escapeHTML(variable.raw);
-                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${escapedRaw}]</span>`;
-                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
+                span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
+                span.textContent = `[${match.variable.raw}]`;
             }
 
             promptOutput.appendChild(span);
             lastIndex = match.end;
         });
-        if (promptOutput.tagName === 'TEXTAREA') {
-            // Revert escaped HTML characters in textarea value
-            let content = finalContent;
-            if (content.includes('&')) {
-                content = content.replace(REVERT_ENTITIES_REGEX, tag => ENTITY_MAP[tag]);
-            }
-            // Remove the span tags that were added for DIV formatting
-            if (content.includes('<span')) {
-                content = content.replace(REVERT_SPANS_REGEX, '');
-            }
-            promptOutput.value = content;
-        } else {
-            promptOutput.innerHTML = finalContent;
+        // Final text after last match
+        if (content.length > lastIndex) {
+            promptOutput.appendChild(document.createTextNode(content.substring(lastIndex)));
         }
     }
 }
@@ -319,6 +298,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             renderSidebar(promptsData, e.target.value);
+        });
+    }
+
+    // Event delegation for prompt selection
+    if (sidebarContent) {
+        sidebarContent.addEventListener('click', (e) => {
+            const btn = e.target.closest('.prompt-btn');
+            if (!btn) return;
+
+            const promptId = btn.dataset.promptId;
+            const categoryName = btn.dataset.categoryName;
+
+            // Find prompt in promptsData
+            for (let i = 0; i < promptsData.length; i++) {
+                const category = promptsData[i];
+                if (category.name === categoryName) {
+                    const prompts = category.prompts;
+                    for (let j = 0; j < prompts.length; j++) {
+                        const prompt = prompts[j];
+                        if (String(prompt.id) === String(promptId)) {
+                            selectPrompt(prompt, categoryName);
+                            return;
+                        }
+                    }
+                }
+            }
         });
     }
 
