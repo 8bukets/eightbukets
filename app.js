@@ -4,6 +4,27 @@ let promptsData = [];
 let currentPrompt = null;
 let variables = [];
 
+// Pre-compute maps and regexes for performance
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;'
+};
+const HTML_ESCAPE_CHECK_REGEX = /[&<>'"]/;
+const HTML_ESCAPE_REGEX = /[&<>'"]/g;
+
+const ENTITY_MAP = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&#39;': "'",
+    '&quot;': '"'
+};
+const REVERT_ENTITIES_REGEX = /&amp;|&lt;|&gt;|&#39;|&quot;/g;
+const REVERT_SPANS_REGEX = /<span class="[^"]*">|<\/span>/g;
+
 // Helper to escape HTML and prevent XSS
 const HTML_ESCAPE_MAP = {
     '&': '&amp;',
@@ -202,16 +223,15 @@ function updateOutput() {
         });
         if (promptOutput.tagName === 'TEXTAREA') {
             // Revert escaped HTML characters in textarea value
-            promptOutput.value = finalContent
-                .replace(/&amp;/g, '&')
-                .replace(/&lt;/g, '<')
-                .replace(/&gt;/g, '>')
-                .replace(/&#39;/g, "'")
-                .replace(/&quot;/g, '"');
+            let content = finalContent;
+            if (content.includes('&')) {
+                content = content.replace(REVERT_ENTITIES_REGEX, tag => ENTITY_MAP[tag]);
+            }
             // Remove the span tags that were added for DIV formatting
-            promptOutput.value = promptOutput.value
-                .replace(/<span class="[^"]*">/g, '')
-                .replace(/<\/span>/g, '');
+            if (content.includes('<span')) {
+                content = content.replace(REVERT_SPANS_REGEX, '');
+            }
+            promptOutput.value = content;
         } else {
             promptOutput.innerHTML = finalContent;
         }
