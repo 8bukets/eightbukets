@@ -26,9 +26,19 @@ const REVERT_ENTITIES_REGEX = /&amp;|&lt;|&gt;|&#39;|&quot;/g;
 const REVERT_SPANS_REGEX = /<span class="[^"]*">|<\/span>/g;
 
 // Helper to escape HTML and prevent XSS
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;'
+};
+const HTML_ESCAPE_REGEX = /[&<>'"]/g;
+
 function escapeHTML(str) {
-    if (!str || !HTML_ESCAPE_CHECK_REGEX.test(str)) return str;
-    return str.replace(HTML_ESCAPE_REGEX, tag => HTML_ESCAPE_MAP[tag]);
+    if (!str) return str;
+    if (!HTML_ESCAPE_REGEX.test(str)) return str;
+    return str.replace(HTML_ESCAPE_REGEX, (char) => HTML_ESCAPE_MAP[char]);
 }
 
 // Render Sidebar
@@ -123,6 +133,7 @@ function parseVariables(content) {
 
 // Select a prompt
 function selectPrompt(prompt, categoryName) {
+    if (!prompt) return;
     currentPrompt = prompt;
 
     // Re-render sidebar to update highlighting
@@ -205,7 +216,8 @@ function updateOutput() {
                 const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
                 finalContent = finalContent.replace(replaceRegex, () => htmlVal);
             } else {
-                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
+                let escapedRaw = escapeHTML(variable.raw);
+                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${escapedRaw}]</span>`;
                 finalContent = finalContent.replace(replaceRegex, () => htmlVal);
             }
         });
@@ -257,7 +269,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderSidebar(promptsData);
     } catch (error) {
         console.error('Error loading prompts:', error);
-        if (sidebarContent) sidebarContent.innerHTML = '<p class="text-red-500">Failed to load prompts.</p>';
+        if (sidebarContent) {
+            sidebarContent.innerHTML = '';
+            const errorMsg = document.createElement('p');
+            errorMsg.className = 'text-red-500';
+            errorMsg.textContent = 'Failed to load prompts.';
+            sidebarContent.appendChild(errorMsg);
+        }
     }
 
     // Search functionality
@@ -293,7 +311,6 @@ if (typeof module !== 'undefined' && module.exports) {
         renderSidebar,
         parseVariables,
         selectPrompt,
-        parseVariables,
         renderForm,
         updateOutput,
         setPromptsData: (data) => promptsData = data,
