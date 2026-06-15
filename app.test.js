@@ -81,6 +81,34 @@ describe('Prompts Library Error Handling', () => {
 
         consoleSpy.mockRestore();
     });
+
+    test('should render error message as text even if error object contains malicious content', async () => {
+        // Mock fetch to reject with an error containing a malicious string
+        const maliciousString = '<img src=x onerror=alert(1)>';
+        const mockError = new Error(maliciousString);
+        global.fetch.mockRejectedValueOnce(mockError);
+
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        await new Promise(process.nextTick);
+
+        const sidebarContent = document.getElementById('sidebar-content');
+        const errorP = sidebarContent.querySelector('p');
+
+        // The hardcoded message should be there
+        expect(errorP.textContent).toBe('Failed to load prompts.');
+        // The malicious string should NOT be in the innerHTML as an element
+        expect(sidebarContent.innerHTML).not.toContain(maliciousString);
+
+        consoleSpy.mockRestore();
+    });
 });
 
 describe('escapeHTML', () => {
