@@ -132,4 +132,38 @@ describe('renderForm function', () => {
 
         expect(output.innerHTML).toContain('New value');
     });
+
+    test('should handle variables with special characters in raw string for ID and for attributes', () => {
+        app.parseVariables('Hello [NAME: <script>alert(1)</script>]');
+
+        app.renderForm();
+
+        const label = dynamicForm.querySelector('label');
+        const input = dynamicForm.querySelector('textarea');
+
+        // The ID should be correctly set even with special characters
+        expect(input.id).toBe('input-NAME: <script>alert(1)</script>');
+        expect(label.getAttribute('for')).toBe('input-NAME: <script>alert(1)</script>');
+    });
+
+    test('should function correctly when noVariablesMsg is null', () => {
+        app.setNoVariablesMsg(null);
+        app.parseVariables('No variables');
+
+        // Should not throw
+        app.renderForm();
+
+        expect(dynamicForm.classList.contains('hidden')).toBe(true);
+    });
+
+    test('should correctly set placeholder when hint is present or absent', () => {
+        app.parseVariables('[VAR_WITH_HINT: My hint] and [VAR_NO_HINT]');
+
+        app.renderForm();
+
+        const inputs = dynamicForm.querySelectorAll('textarea');
+
+        expect(inputs[0].placeholder).toBe('e.g. My hint');
+        expect(inputs[1].placeholder).toBe('Enter VAR_NO_HINT...');
+    });
 });
