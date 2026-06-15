@@ -172,41 +172,68 @@ function renderForm() {
 function updateOutput() {
     if (!currentPrompt) return;
 
-    let finalContent = currentPrompt.content;
+    if (!promptOutput) return;
 
-    // Escape HTML to prevent XSS before doing custom highlighting
-    finalContent = escapeHTML(finalContent);
-
-    if (promptOutput) {
+    if (promptOutput.tagName === 'TEXTAREA') {
+        let finalContent = currentPrompt.content;
         variables.forEach(variable => {
             const input = variable.inputElement;
-
             const replaceRegex = variable.replaceRegex;
+            const replacementValue = (input && input.value.trim() !== '') ? input.value : `[${variable.raw}]`;
+            finalContent = finalContent.replace(replaceRegex, () => replacementValue);
+        });
+        promptOutput.value = finalContent;
+    } else {
+        // Clear current content
+        promptOutput.textContent = '';
 
-            if (input && input.value.trim() !== '') {
-                // Escape input to prevent XSS
-                let escapedVal = escapeHTML(input.value);
-                const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
-                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
-            } else {
-                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
-                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
+        let content = currentPrompt.content;
+
+        // Build an array of matches for all variables
+        let matches = [];
+        variables.forEach(variable => {
+            let match;
+            const regex = new RegExp(variable.replaceRegex.source, 'g');
+            while ((match = regex.exec(content)) !== null) {
+                matches.push({
+                    start: match.index,
+                    end: match.index + match[0].length,
+                    variable: variable
+                });
             }
         });
-        if (promptOutput.tagName === 'TEXTAREA') {
-            // Revert escaped HTML characters in textarea value
-            promptOutput.value = finalContent
-                .replace(/&amp;/g, '&')
-                .replace(/&lt;/g, '<')
-                .replace(/&gt;/g, '>')
-                .replace(/&#39;/g, "'")
-                .replace(/&quot;/g, '"');
-            // Remove the span tags that were added for DIV formatting
-            promptOutput.value = promptOutput.value
-                .replace(/<span class="[^"]*">/g, '')
-                .replace(/<\/span>/g, '');
-        } else {
-            promptOutput.innerHTML = finalContent;
+
+        // Sort matches by start index
+        matches.sort((a, b) => a.start - b.start);
+
+        let lastIndex = 0;
+        matches.forEach(match => {
+            if (match.start < lastIndex) return; // Skip overlapping matches
+
+            // Add text before the variable
+            if (match.start > lastIndex) {
+                promptOutput.appendChild(document.createTextNode(content.substring(lastIndex, match.start)));
+            }
+
+            // Create span for variable
+            const span = document.createElement('span');
+            const input = match.variable.inputElement;
+
+            if (input && input.value.trim() !== '') {
+                span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
+                span.textContent = input.value;
+            } else {
+                span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
+                span.textContent = `[${match.variable.raw}]`;
+            }
+
+            promptOutput.appendChild(span);
+            lastIndex = match.end;
+        });
+
+        // Add remaining text
+        if (lastIndex < content.length) {
+            promptOutput.appendChild(document.createTextNode(content.substring(lastIndex)));
         }
     }
 }
