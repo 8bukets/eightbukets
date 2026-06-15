@@ -38,10 +38,7 @@ def parse_prompts(data=None, filename='prompts.txt'):
         for j in range(1, len(prompt_blocks), 3):
             pid = int(prompt_blocks[j])
             title = prompt_blocks[j+1].strip()
-            content = prompt_blocks[j+2].strip()
-
-            if "How to Get Maximum Value From This Collection" in content:
-                content = content.replace("How to Get Maximum Value From This Collection", "").strip()
+            content = prompt_blocks[j+2].replace("How to Get Maximum Value From This Collection", "").strip()
 
             prompts.append({
                 "id": pid,
