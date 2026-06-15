@@ -189,7 +189,8 @@ function updateOutput() {
                 const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
                 finalContent = finalContent.replace(replaceRegex, () => htmlVal);
             } else {
-                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
+                let escapedRaw = escapeHTML(variable.raw);
+                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${escapedRaw}]</span>`;
                 finalContent = finalContent.replace(replaceRegex, () => htmlVal);
             }
         });
@@ -242,7 +243,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderSidebar(promptsData);
     } catch (error) {
         console.error('Error loading prompts:', error);
-        if (sidebarContent) sidebarContent.innerHTML = '<p class="text-red-500">Failed to load prompts.</p>';
+        if (sidebarContent) {
+            sidebarContent.innerHTML = '';
+            const errorMsg = document.createElement('p');
+            errorMsg.className = 'text-red-500';
+            errorMsg.textContent = 'Failed to load prompts.';
+            sidebarContent.appendChild(errorMsg);
+        }
     }
 
     // Search functionality
