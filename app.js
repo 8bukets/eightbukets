@@ -107,6 +107,7 @@ function parseVariables(content) {
 
 // Select a prompt
 function selectPrompt(prompt, categoryName) {
+    if (!prompt) return;
     currentPrompt = prompt;
 
     // Re-render sidebar to update highlighting
