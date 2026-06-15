@@ -4,15 +4,41 @@ let promptsData = [];
 let currentPrompt = null;
 let variables = [];
 
+// Pre-compute maps and regexes for performance
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;'
+};
+const HTML_ESCAPE_CHECK_REGEX = /[&<>'"]/;
+const HTML_ESCAPE_REGEX = /[&<>'"]/g;
+
+const ENTITY_MAP = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&#39;': "'",
+    '&quot;': '"'
+};
+const REVERT_ENTITIES_REGEX = /&amp;|&lt;|&gt;|&#39;|&quot;/g;
+const REVERT_SPANS_REGEX = /<span class="[^"]*">|<\/span>/g;
+
 // Helper to escape HTML and prevent XSS
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;'
+};
+const HTML_ESCAPE_REGEX = /[&<>'"]/g;
+
 function escapeHTML(str) {
     if (!str) return str;
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/'/g, '&#39;')
-        .replace(/"/g, '&quot;');
+    if (!HTML_ESCAPE_REGEX.test(str)) return str;
+    return str.replace(HTML_ESCAPE_REGEX, (char) => HTML_ESCAPE_MAP[char]);
 }
 
 // Render Sidebar
@@ -107,6 +133,7 @@ function parseVariables(content) {
 
 // Select a prompt
 function selectPrompt(prompt, categoryName) {
+    if (!prompt) return;
     currentPrompt = prompt;
 
     // Re-render sidebar to update highlighting
@@ -223,17 +250,27 @@ function updateOutput() {
                 span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
                 span.textContent = input.value;
             } else {
-                span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
-                span.textContent = `[${match.variable.raw}]`;
+                let escapedRaw = escapeHTML(variable.raw);
+                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${escapedRaw}]</span>`;
+                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
             }
 
             promptOutput.appendChild(span);
             lastIndex = match.end;
         });
-
-        // Add remaining text
-        if (lastIndex < content.length) {
-            promptOutput.appendChild(document.createTextNode(content.substring(lastIndex)));
+        if (promptOutput.tagName === 'TEXTAREA') {
+            // Revert escaped HTML characters in textarea value
+            let content = finalContent;
+            if (content.includes('&')) {
+                content = content.replace(REVERT_ENTITIES_REGEX, tag => ENTITY_MAP[tag]);
+            }
+            // Remove the span tags that were added for DIV formatting
+            if (content.includes('<span')) {
+                content = content.replace(REVERT_SPANS_REGEX, '');
+            }
+            promptOutput.value = content;
+        } else {
+            promptOutput.innerHTML = finalContent;
         }
     }
 }
@@ -269,7 +306,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderSidebar(promptsData);
     } catch (error) {
         console.error('Error loading prompts:', error);
-        if (sidebarContent) sidebarContent.innerHTML = '<p class="text-red-500">Failed to load prompts.</p>';
+        if (sidebarContent) {
+            sidebarContent.innerHTML = '';
+            const errorMsg = document.createElement('p');
+            errorMsg.className = 'text-red-500';
+            errorMsg.textContent = 'Failed to load prompts.';
+            sidebarContent.appendChild(errorMsg);
+        }
     }
 
     // Search functionality
@@ -305,7 +348,6 @@ if (typeof module !== 'undefined' && module.exports) {
         renderSidebar,
         parseVariables,
         selectPrompt,
-        parseVariables,
         renderForm,
         updateOutput,
         setPromptsData: (data) => promptsData = data,
