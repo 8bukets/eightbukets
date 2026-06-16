@@ -12,8 +12,11 @@ const HTML_ESCAPE_MAP = {
     "'": '&#39;',
     '"': '&quot;'
 };
+const HTML_ESCAPE_CHECK_REGEX = /[&<>'"]/;
 const HTML_ESCAPE_REGEX = /[&<>'"]/g;
 
+
+// Helper to escape HTML and prevent XSS
 function escapeHTML(str) {
     if (!str) return str;
     if (!HTML_ESCAPE_REGEX.test(str)) return str;
@@ -187,9 +190,7 @@ function renderForm() {
 
 // Update Textarea Output
 function updateOutput() {
-    if (!currentPrompt) return;
-
-    if (!promptOutput) return;
+    if (!currentPrompt || !promptOutput) return;
 
     if (promptOutput.tagName === 'TEXTAREA') {
         let finalContent = currentPrompt.content;
@@ -234,21 +235,23 @@ function updateOutput() {
 
             // Create span for variable
             const span = document.createElement('span');
-            const input = match.variable.inputElement;
+            const variable = match.variable;
+            const input = variable.inputElement;
 
             if (input && input.value.trim() !== '') {
                 span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
                 span.textContent = input.value;
             } else {
                 span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
-                span.textContent = `[${match.variable.raw}]`;
+                span.textContent = `[${variable.raw}]`;
             }
 
             promptOutput.appendChild(span);
             lastIndex = match.end;
         });
-        // Final text after last match
-        if (content.length > lastIndex) {
+
+        // Add remaining text
+        if (lastIndex < content.length) {
             promptOutput.appendChild(document.createTextNode(content.substring(lastIndex)));
         }
     }
