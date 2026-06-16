@@ -89,21 +89,23 @@ function renderSidebar(categories, filterText = '') {
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 
 function parseVariables(content) {
+    if (!content) {
+        variables = [];
+        return [];
+    }
     const regex = /\[(.*?)\]/g;
-    variables = [];
+    const localVariables = [];
     const seenVars = new Set();
     let match;
 
     while ((match = regex.exec(content)) !== null) {
         const rawVar = match[1];
 
-        // Avoid duplicates
         if (seenVars.has(rawVar)) {
             continue;
         }
         seenVars.add(rawVar);
 
-        // Split variable name and hint
         let varName = rawVar;
         let varHint = "";
         const separator = ['—', ':'].find(s => rawVar.includes(s));
@@ -114,14 +116,15 @@ function parseVariables(content) {
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-        variables.push({
+        localVariables.push({
             raw: rawVar,
             name: varName,
             hint: varHint,
             replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
         });
     }
-    return variables;
+    variables = localVariables;
+    return localVariables;
 }
 
 // Select a prompt
@@ -129,21 +132,18 @@ function selectPrompt(prompt, categoryName) {
     if (!prompt) return;
     currentPrompt = prompt;
 
-    // Re-render sidebar to update highlighting
     if (searchInput) renderSidebar(promptsData, searchInput.value);
 
-    // Update UI
     if (welcomeMessage) welcomeMessage.classList.add('hidden');
     if (promptWorkspace) {
         promptWorkspace.classList.remove('hidden');
         promptWorkspace.classList.add('flex');
     }
 
-    if (promptCategory) promptCategory.textContent = categoryName;
-    if (promptTitle) promptTitle.textContent = prompt.title;
+    if (promptCategory) promptCategory.textContent = categoryName || '';
+    if (promptTitle) promptTitle.textContent = prompt.title || '';
 
-    // Parse variables like [TOPIC], [YOUR NICHE]
-    variables = parseVariables(prompt.content);
+    parseVariables(prompt.content || '');
 
     renderForm();
     updateOutput();
@@ -176,7 +176,6 @@ function renderForm() {
             input.rows = 2;
             input.placeholder = variable.hint ? `e.g. ${variable.hint}` : `Enter ${variable.name}...`;
 
-            // Cache the input element directly on the variable object to avoid repeated DOM queries in loops
             variable.inputElement = input;
 
             input.addEventListener('input', updateOutput);
@@ -188,26 +187,20 @@ function renderForm() {
     }
 }
 
-// Update Textarea Output
+// Update Output
 function updateOutput() {
     if (!currentPrompt || !promptOutput) return;
 
-    if (promptOutput.tagName === 'TEXTAREA') {
-        let finalContent = currentPrompt.content;
-        variables.forEach(variable => {
-            const input = variable.inputElement;
-            const replaceRegex = variable.replaceRegex;
-            const replacementValue = (input && input.value.trim() !== '') ? input.value : `[${variable.raw}]`;
-            finalContent = finalContent.replace(replaceRegex, () => replacementValue);
+    if (isTextarea) {
+        let result = content;
+        variables.forEach(v => {
+            const val = (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
+            result = result.replace(v.replaceRegex, () => val);
         });
-        promptOutput.value = finalContent;
+        promptOutput.value = result;
     } else {
-        // Clear current content
         promptOutput.textContent = '';
 
-        let content = currentPrompt.content;
-
-        // Build an array of matches for all variables
         let matches = [];
         variables.forEach(variable => {
             let match;
@@ -221,24 +214,21 @@ function updateOutput() {
             }
         });
 
-        // Sort matches by start index
         matches.sort((a, b) => a.start - b.start);
 
         let lastIndex = 0;
         matches.forEach(match => {
-            if (match.start < lastIndex) return; // Skip overlapping matches
+            if (match.start < lastIndex) return;
 
-            // Add text before the variable
             if (match.start > lastIndex) {
                 promptOutput.appendChild(document.createTextNode(content.substring(lastIndex, match.start)));
             }
 
-            // Create span for variable
             const span = document.createElement('span');
             const variable = match.variable;
             const input = variable.inputElement;
 
-            if (input && input.value.trim() !== '') {
+            if (isFilled) {
                 span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
                 span.textContent = input.value;
             } else {
@@ -271,12 +261,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     copyToast = document.getElementById('copy-toast');
     noVariablesMsg = document.getElementById('no-variables-msg');
 
-    // Fetch JSON data
     try {
         const response = await fetch('prompts.json');
         const data = await response.json();
 
-        // Pre-compute lowercase strings for faster search filtering
         data.categories.forEach(category => {
             category.prompts.forEach(prompt => {
                 if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
@@ -297,7 +285,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Search functionality
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             renderSidebar(promptsData, e.target.value);
