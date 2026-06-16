@@ -19,7 +19,6 @@
   },
   "homepage": "https://github.com/8bukets/eightbukets#readme",
   "devDependencies": {
-    "jest": "^30.4.2",
-    "jest-environment-jsdom": "^30.4.1"
+    "jest": "^30.4.2"
   }
 }
