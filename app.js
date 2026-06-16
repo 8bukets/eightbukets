@@ -25,16 +25,6 @@ const ENTITY_MAP = {
 const REVERT_ENTITIES_REGEX = /&amp;|&lt;|&gt;|&#39;|&quot;/g;
 const REVERT_SPANS_REGEX = /<span class="[^"]*">|<\/span>/g;
 
-// Helper to escape HTML and prevent XSS
-const HTML_ESCAPE_MAP = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    "'": '&#39;',
-    '"': '&quot;'
-};
-const HTML_ESCAPE_REGEX = /[&<>'"]/g;
-
 function escapeHTML(str) {
     if (!str) return str;
     if (!HTML_ESCAPE_REGEX.test(str)) return str;
@@ -50,8 +40,6 @@ function renderSidebar(categories, filterText = '') {
 
     categories.forEach(category => {
         const filteredPrompts = category.prompts.filter(prompt => {
-            // Strictly use pre-computed lowercase fields to avoid repeated string manipulation
-            // and fallback to empty string if missing to avoid throwing and maintain performance
             return (prompt.titleLower || '').includes(filterTextLower) || (prompt.contentLower || '').includes(filterTextLower);
         });
 
@@ -73,7 +61,6 @@ function renderSidebar(categories, filterText = '') {
             const btn = document.createElement('button');
             btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate';
 
-            // Add highlighting if this is the currently selected prompt
             if (currentPrompt && currentPrompt.id === prompt.id) {
                 btn.classList.add('bg-indigo-100', 'text-indigo-800', 'font-semibold');
             } else {
@@ -96,21 +83,23 @@ function renderSidebar(categories, filterText = '') {
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 
 function parseVariables(content) {
+    if (!content) {
+        variables = [];
+        return [];
+    }
     const regex = /\[(.*?)\]/g;
-    variables = [];
+    const localVariables = [];
     const seenVars = new Set();
     let match;
 
     while ((match = regex.exec(content)) !== null) {
         const rawVar = match[1];
 
-        // Avoid duplicates
         if (seenVars.has(rawVar)) {
             continue;
         }
         seenVars.add(rawVar);
 
-        // Split variable name and hint
         let varName = rawVar;
         let varHint = "";
         const separator = ['—', ':'].find(s => rawVar.includes(s));
@@ -121,14 +110,15 @@ function parseVariables(content) {
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-        variables.push({
+        localVariables.push({
             raw: rawVar,
             name: varName,
             hint: varHint,
             replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
         });
     }
-    return variables;
+    variables = localVariables;
+    return localVariables;
 }
 
 // Select a prompt
@@ -136,21 +126,18 @@ function selectPrompt(prompt, categoryName) {
     if (!prompt) return;
     currentPrompt = prompt;
 
-    // Re-render sidebar to update highlighting
     if (searchInput) renderSidebar(promptsData, searchInput.value);
 
-    // Update UI
     if (welcomeMessage) welcomeMessage.classList.add('hidden');
     if (promptWorkspace) {
         promptWorkspace.classList.remove('hidden');
         promptWorkspace.classList.add('flex');
     }
 
-    if (promptCategory) promptCategory.textContent = categoryName;
-    if (promptTitle) promptTitle.textContent = prompt.title;
+    if (promptCategory) promptCategory.textContent = categoryName || '';
+    if (promptTitle) promptTitle.textContent = prompt.title || '';
 
-    // Parse variables like [TOPIC], [YOUR NICHE]
-    variables = parseVariables(prompt.content);
+    parseVariables(prompt.content || '');
 
     renderForm();
     updateOutput();
@@ -183,7 +170,6 @@ function renderForm() {
             input.rows = 2;
             input.placeholder = variable.hint ? `e.g. ${variable.hint}` : `Enter ${variable.name}...`;
 
-            // Cache the input element directly on the variable object to avoid repeated DOM queries in loops
             variable.inputElement = input;
 
             input.addEventListener('input', updateOutput);
@@ -195,28 +181,23 @@ function renderForm() {
     }
 }
 
-// Update Textarea Output
+// Update Output
 function updateOutput() {
-    if (!currentPrompt) return;
+    if (!currentPrompt || !promptOutput) return;
 
-    if (!promptOutput) return;
+    const isTextarea = promptOutput.tagName === 'TEXTAREA';
+    const content = currentPrompt.content || '';
 
-    if (promptOutput.tagName === 'TEXTAREA') {
-        let finalContent = currentPrompt.content;
-        variables.forEach(variable => {
-            const input = variable.inputElement;
-            const replaceRegex = variable.replaceRegex;
-            const replacementValue = (input && input.value.trim() !== '') ? input.value : `[${variable.raw}]`;
-            finalContent = finalContent.replace(replaceRegex, () => replacementValue);
+    if (isTextarea) {
+        let result = content;
+        variables.forEach(v => {
+            const val = (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
+            result = result.replace(v.replaceRegex, () => val);
         });
-        promptOutput.value = finalContent;
+        promptOutput.value = result;
     } else {
-        // Clear current content
         promptOutput.textContent = '';
 
-        let content = currentPrompt.content;
-
-        // Build an array of matches for all variables
         let matches = [];
         variables.forEach(variable => {
             let match;
@@ -230,47 +211,34 @@ function updateOutput() {
             }
         });
 
-        // Sort matches by start index
         matches.sort((a, b) => a.start - b.start);
 
         let lastIndex = 0;
         matches.forEach(match => {
-            if (match.start < lastIndex) return; // Skip overlapping matches
+            if (match.start < lastIndex) return;
 
-            // Add text before the variable
             if (match.start > lastIndex) {
                 promptOutput.appendChild(document.createTextNode(content.substring(lastIndex, match.start)));
             }
 
-            // Create span for variable
             const span = document.createElement('span');
             const input = match.variable.inputElement;
+            const isFilled = input && input.value.trim() !== '';
 
-            if (input && input.value.trim() !== '') {
+            if (isFilled) {
                 span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
                 span.textContent = input.value;
             } else {
-                let escapedRaw = escapeHTML(variable.raw);
-                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${escapedRaw}]</span>`;
-                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
+                span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
+                span.textContent = `[${match.variable.raw}]`;
             }
 
             promptOutput.appendChild(span);
             lastIndex = match.end;
         });
-        if (promptOutput.tagName === 'TEXTAREA') {
-            // Revert escaped HTML characters in textarea value
-            let content = finalContent;
-            if (content.includes('&')) {
-                content = content.replace(REVERT_ENTITIES_REGEX, tag => ENTITY_MAP[tag]);
-            }
-            // Remove the span tags that were added for DIV formatting
-            if (content.includes('<span')) {
-                content = content.replace(REVERT_SPANS_REGEX, '');
-            }
-            promptOutput.value = content;
-        } else {
-            promptOutput.innerHTML = finalContent;
+
+        if (lastIndex < content.length) {
+            promptOutput.appendChild(document.createTextNode(content.substring(lastIndex)));
         }
     }
 }
@@ -289,12 +257,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     copyToast = document.getElementById('copy-toast');
     noVariablesMsg = document.getElementById('no-variables-msg');
 
-    // Fetch JSON data
     try {
         const response = await fetch('prompts.json');
         const data = await response.json();
 
-        // Pre-compute lowercase strings for faster search filtering
         data.categories.forEach(category => {
             category.prompts.forEach(prompt => {
                 if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
@@ -315,14 +281,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Search functionality
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             renderSidebar(promptsData, e.target.value);
         });
     }
 
-    // Copy to Clipboard
     if (copyBtn) {
         copyBtn.addEventListener('click', () => {
             const textToCopy = promptOutput.textContent || promptOutput.value;
