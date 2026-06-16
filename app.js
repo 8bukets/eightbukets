@@ -15,25 +15,6 @@ const HTML_ESCAPE_MAP = {
 const HTML_ESCAPE_CHECK_REGEX = /[&<>'"]/;
 const HTML_ESCAPE_REGEX = /[&<>'"]/g;
 
-const ENTITY_MAP = {
-    '&amp;': '&',
-    '&lt;': '<',
-    '&gt;': '>',
-    '&#39;': "'",
-    '&quot;': '"'
-};
-const REVERT_ENTITIES_REGEX = /&amp;|&lt;|&gt;|&#39;|&quot;/g;
-const REVERT_SPANS_REGEX = /<span class="[^"]*">|<\/span>/g;
-
-// Helper to escape HTML and prevent XSS
-const HTML_ESCAPE_MAP = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    "'": '&#39;',
-    '"': '&quot;'
-};
-const HTML_ESCAPE_REGEX = /[&<>'"]/g;
 
 function escapeHTML(str) {
     if (!str) return str;
@@ -197,9 +178,7 @@ function renderForm() {
 
 // Update Textarea Output
 function updateOutput() {
-    if (!currentPrompt) return;
-
-    if (!promptOutput) return;
+    if (!currentPrompt || !promptOutput) return;
 
     if (promptOutput.tagName === 'TEXTAREA') {
         let finalContent = currentPrompt.content;
@@ -244,33 +223,24 @@ function updateOutput() {
 
             // Create span for variable
             const span = document.createElement('span');
-            const input = match.variable.inputElement;
+            const variable = match.variable;
+            const input = variable.inputElement;
 
             if (input && input.value.trim() !== '') {
                 span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
                 span.textContent = input.value;
             } else {
-                let escapedRaw = escapeHTML(variable.raw);
-                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${escapedRaw}]</span>`;
-                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
+                span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
+                span.textContent = `[${variable.raw}]`;
             }
 
             promptOutput.appendChild(span);
             lastIndex = match.end;
         });
-        if (promptOutput.tagName === 'TEXTAREA') {
-            // Revert escaped HTML characters in textarea value
-            let content = finalContent;
-            if (content.includes('&')) {
-                content = content.replace(REVERT_ENTITIES_REGEX, tag => ENTITY_MAP[tag]);
-            }
-            // Remove the span tags that were added for DIV formatting
-            if (content.includes('<span')) {
-                content = content.replace(REVERT_SPANS_REGEX, '');
-            }
-            promptOutput.value = content;
-        } else {
-            promptOutput.innerHTML = finalContent;
+
+        // Add remaining text
+        if (lastIndex < content.length) {
+            promptOutput.appendChild(document.createTextNode(content.substring(lastIndex)));
         }
     }
 }
