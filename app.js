@@ -26,18 +26,28 @@ function escapeHTML(str) {
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
+    sidebarContent.textContent = '';
 
     // Clear efficiently
     sidebarContent.textContent = '';
 
     const fragment = document.createDocumentFragment();
     const filterTextLower = filterText.toLowerCase();
+    const fragment = document.createDocumentFragment();
 
-    for (let i = 0; i < categories.length; i++) {
+    const categoriesLength = categories.length;
+    for (let i = 0; i < categoriesLength; i++) {
         const category = categories[i];
-        const filteredPrompts = category.prompts.filter(prompt => {
-            return (prompt.titleLower || '').includes(filterTextLower) || (prompt.contentLower || '').includes(filterTextLower);
-        });
+        const prompts = category.prompts;
+        const promptsLength = prompts.length;
+        const filteredPrompts = [];
+
+        for (let j = 0; j < promptsLength; j++) {
+            const prompt = prompts[j];
+            if ((prompt.titleLower || '').includes(filterTextLower) || (prompt.contentLower || '').includes(filterTextLower)) {
+                filteredPrompts.push(prompt);
+            }
+        }
 
         if (filteredPrompts.length === 0) continue;
 
@@ -52,20 +62,21 @@ function renderSidebar(categories, filterText = '') {
         const promptList = document.createElement('ul');
         promptList.className = 'space-y-1';
 
-        for (let j = 0; j < filteredPrompts.length; j++) {
+        const filteredLength = filteredPrompts.length;
+        for (let j = 0; j < filteredLength; j++) {
             const prompt = filteredPrompts[j];
             const li = document.createElement('li');
             const btn = document.createElement('button');
-            btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate';
 
-            if (currentPrompt && currentPrompt.id === prompt.id) {
-                btn.classList.add('bg-indigo-100', 'text-indigo-800', 'font-semibold');
-            } else {
-                btn.classList.add('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-700');
-            }
+            const isSelected = currentPrompt && currentPrompt.id === prompt.id;
+            btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate' +
+                (isSelected ? ' bg-indigo-100 text-indigo-800 font-semibold' : ' text-gray-700 hover:bg-indigo-50 hover:text-indigo-700');
 
             btn.textContent = prompt.title;
-            btn.onclick = () => selectPrompt(prompt, category.name);
+
+            // Store data for event delegation
+            btn.dataset.promptId = prompt.id;
+            btn.dataset.categoryName = category.name;
 
             li.appendChild(btn);
             promptList.appendChild(li);
@@ -82,21 +93,23 @@ function renderSidebar(categories, filterText = '') {
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 
 function parseVariables(content) {
+    if (!content) {
+        variables = [];
+        return [];
+    }
     const regex = /\[(.*?)\]/g;
-    variables = [];
+    const localVariables = [];
     const seenVars = new Set();
     let match;
 
     while ((match = regex.exec(content)) !== null) {
         const rawVar = match[1];
 
-        // Avoid duplicates
         if (seenVars.has(rawVar)) {
             continue;
         }
         seenVars.add(rawVar);
 
-        // Split variable name and hint
         let varName = rawVar;
         let varHint = "";
         const separator = ['—', ':'].find(s => rawVar.includes(s));
@@ -107,14 +120,15 @@ function parseVariables(content) {
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-        variables.push({
+        localVariables.push({
             raw: rawVar,
             name: varName,
             hint: varHint,
             replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
         });
     }
-    return variables;
+    variables = localVariables;
+    return localVariables;
 }
 
 // Select a prompt
@@ -122,21 +136,18 @@ function selectPrompt(prompt, categoryName) {
     if (!prompt) return;
     currentPrompt = prompt;
 
-    // Re-render sidebar to update highlighting
     if (searchInput) renderSidebar(promptsData, searchInput.value);
 
-    // Update UI
     if (welcomeMessage) welcomeMessage.classList.add('hidden');
     if (promptWorkspace) {
         promptWorkspace.classList.remove('hidden');
         promptWorkspace.classList.add('flex');
     }
 
-    if (promptCategory) promptCategory.textContent = categoryName;
-    if (promptTitle) promptTitle.textContent = prompt.title;
+    if (promptCategory) promptCategory.textContent = categoryName || '';
+    if (promptTitle) promptTitle.textContent = prompt.title || '';
 
-    // Parse variables like [TOPIC], [YOUR NICHE]
-    variables = parseVariables(prompt.content);
+    parseVariables(prompt.content || '');
 
     renderForm();
     updateOutput();
@@ -175,7 +186,6 @@ function renderForm() {
             input.rows = 2;
             input.placeholder = variable.hint ? `e.g. ${variable.hint}` : `Enter ${variable.name}...`;
 
-            // Cache the input element directly on the variable object to avoid repeated DOM queries in loops
             variable.inputElement = input;
 
             input.addEventListener('input', updateOutput);
@@ -189,37 +199,20 @@ function renderForm() {
     }
 }
 
-// Update Textarea Output
+// Update Output
 function updateOutput() {
     if (!currentPrompt || !promptOutput) return;
 
-    if (promptOutput.tagName === 'TEXTAREA') {
-        let finalContent = currentPrompt.content;
-
-        if (variables.length > 0) {
-            // Build a combined regex for all variables to do a single pass replacement if possible
-            // Note: v.replaceRegex is already global
-            const combinedRegexSource = variables.map(v => v.replaceRegex.source).join('|');
-            const combinedRegex = new RegExp(combinedRegexSource, 'g');
-
-            finalContent = finalContent.replace(combinedRegex, (match) => {
-                const variable = variables.find(v => `[${v.raw}]` === match);
-                if (variable) {
-                    const input = variable.inputElement;
-                    return (input && input.value.trim() !== '') ? input.value : match;
-                }
-                return match;
-            });
-        }
-
-        promptOutput.value = finalContent;
+    if (isTextarea) {
+        let result = content;
+        variables.forEach(v => {
+            const val = (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
+            result = result.replace(v.replaceRegex, () => val);
+        });
+        promptOutput.value = result;
     } else {
-        // Clear current content
         promptOutput.textContent = '';
 
-        let content = currentPrompt.content;
-
-        // Build an array of matches for all variables
         let matches = [];
         variables.forEach(variable => {
             let match;
@@ -233,24 +226,21 @@ function updateOutput() {
             }
         });
 
-        // Sort matches by start index
         matches.sort((a, b) => a.start - b.start);
 
         let lastIndex = 0;
         matches.forEach(match => {
-            if (match.start < lastIndex) return; // Skip overlapping matches
+            if (match.start < lastIndex) return;
 
-            // Add text before the variable
             if (match.start > lastIndex) {
                 promptOutput.appendChild(document.createTextNode(content.substring(lastIndex, match.start)));
             }
 
-            // Create span for variable
             const span = document.createElement('span');
             const variable = match.variable;
             const input = variable.inputElement;
 
-            if (input && input.value.trim() !== '') {
+            if (isFilled) {
                 span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
                 span.textContent = input.value;
             } else {
@@ -283,12 +273,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     copyToast = document.getElementById('copy-toast');
     noVariablesMsg = document.getElementById('no-variables-msg');
 
-    // Fetch JSON data
     try {
         const response = await fetch('prompts.json');
         const data = await response.json();
 
-        // Pre-compute lowercase strings for faster search filtering
         data.categories.forEach(category => {
             category.prompts.forEach(prompt => {
                 if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
@@ -309,10 +297,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Search functionality
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             renderSidebar(promptsData, e.target.value);
+        });
+    }
+
+    // Event delegation for prompt selection
+    if (sidebarContent) {
+        sidebarContent.addEventListener('click', (e) => {
+            const btn = e.target.closest('.prompt-btn');
+            if (!btn) return;
+
+            const promptId = btn.dataset.promptId;
+            const categoryName = btn.dataset.categoryName;
+
+            // Find prompt in promptsData
+            for (let i = 0; i < promptsData.length; i++) {
+                const category = promptsData[i];
+                if (category.name === categoryName) {
+                    const prompts = category.prompts;
+                    for (let j = 0; j < prompts.length; j++) {
+                        const prompt = prompts[j];
+                        if (String(prompt.id) === String(promptId)) {
+                            selectPrompt(prompt, categoryName);
+                            return;
+                        }
+                    }
+                }
+            }
         });
     }
 
