@@ -19,25 +19,27 @@ const HTML_ESCAPE_REGEX = /[&<>'"]/g;
 // Helper to escape HTML and prevent XSS
 function escapeHTML(str) {
     if (!str) return str;
-    if (!HTML_ESCAPE_REGEX.test(str)) return str;
+    if (!HTML_ESCAPE_CHECK_REGEX.test(str)) return str;
     return str.replace(HTML_ESCAPE_REGEX, (char) => HTML_ESCAPE_MAP[char]);
 }
 
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
-    sidebarContent.innerHTML = '';
 
+    // Clear efficiently
+    sidebarContent.textContent = '';
+
+    const fragment = document.createDocumentFragment();
     const filterTextLower = filterText.toLowerCase();
 
-    categories.forEach(category => {
+    for (let i = 0; i < categories.length; i++) {
+        const category = categories[i];
         const filteredPrompts = category.prompts.filter(prompt => {
-            // Strictly use pre-computed lowercase fields to avoid repeated string manipulation
-            // and fallback to empty string if missing to avoid throwing and maintain performance
             return (prompt.titleLower || '').includes(filterTextLower) || (prompt.contentLower || '').includes(filterTextLower);
         });
 
-        if (filteredPrompts.length === 0) return;
+        if (filteredPrompts.length === 0) continue;
 
         const categoryDiv = document.createElement('div');
         categoryDiv.className = 'mb-6';
@@ -50,12 +52,12 @@ function renderSidebar(categories, filterText = '') {
         const promptList = document.createElement('ul');
         promptList.className = 'space-y-1';
 
-        filteredPrompts.forEach(prompt => {
+        for (let j = 0; j < filteredPrompts.length; j++) {
+            const prompt = filteredPrompts[j];
             const li = document.createElement('li');
             const btn = document.createElement('button');
             btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate';
 
-            // Add highlighting if this is the currently selected prompt
             if (currentPrompt && currentPrompt.id === prompt.id) {
                 btn.classList.add('bg-indigo-100', 'text-indigo-800', 'font-semibold');
             } else {
@@ -67,11 +69,13 @@ function renderSidebar(categories, filterText = '') {
 
             li.appendChild(btn);
             promptList.appendChild(li);
-        });
+        }
 
         categoryDiv.appendChild(promptList);
-        sidebarContent.appendChild(categoryDiv);
-    });
+        fragment.appendChild(categoryDiv);
+    }
+
+    sidebarContent.appendChild(fragment);
 }
 
 // Pre-compile RegExp to avoid recreation inside loops
@@ -141,7 +145,9 @@ function selectPrompt(prompt, categoryName) {
 // Render Form Inputs
 function renderForm() {
     if (!dynamicForm) return;
-    dynamicForm.innerHTML = '';
+
+    // Clear efficiently
+    dynamicForm.textContent = '';
 
     if (variables.length === 0) {
         if (noVariablesMsg) noVariablesMsg.classList.remove('hidden');
@@ -150,6 +156,8 @@ function renderForm() {
         if (noVariablesMsg) noVariablesMsg.classList.add('hidden');
         dynamicForm.classList.remove('hidden');
 
+        const fragment = document.createDocumentFragment();
+
         variables.forEach(variable => {
             const div = document.createElement('div');
             div.className = 'flex flex-col gap-1';
@@ -157,10 +165,12 @@ function renderForm() {
             const label = document.createElement('label');
             label.className = 'text-xs font-semibold text-gray-600 uppercase';
             label.textContent = variable.name;
-            label.setAttribute('for', `input-${variable.raw}`);
+
+            const safeId = `input-${variable.raw}`;
+            label.setAttribute('for', safeId);
 
             const input = document.createElement('textarea');
-            input.id = `input-${variable.raw}`;
+            input.id = safeId;
             input.className = 'w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-y';
             input.rows = 2;
             input.placeholder = variable.hint ? `e.g. ${variable.hint}` : `Enter ${variable.name}...`;
@@ -172,8 +182,10 @@ function renderForm() {
 
             div.appendChild(label);
             div.appendChild(input);
-            dynamicForm.appendChild(div);
+            fragment.appendChild(div);
         });
+
+        dynamicForm.appendChild(fragment);
     }
 }
 
@@ -183,12 +195,23 @@ function updateOutput() {
 
     if (promptOutput.tagName === 'TEXTAREA') {
         let finalContent = currentPrompt.content;
-        variables.forEach(variable => {
-            const input = variable.inputElement;
-            const replaceRegex = variable.replaceRegex;
-            const replacementValue = (input && input.value.trim() !== '') ? input.value : `[${variable.raw}]`;
-            finalContent = finalContent.replace(replaceRegex, () => replacementValue);
-        });
+
+        if (variables.length > 0) {
+            // Build a combined regex for all variables to do a single pass replacement if possible
+            // Note: v.replaceRegex is already global
+            const combinedRegexSource = variables.map(v => v.replaceRegex.source).join('|');
+            const combinedRegex = new RegExp(combinedRegexSource, 'g');
+
+            finalContent = finalContent.replace(combinedRegex, (match) => {
+                const variable = variables.find(v => `[${v.raw}]` === match);
+                if (variable) {
+                    const input = variable.inputElement;
+                    return (input && input.value.trim() !== '') ? input.value : match;
+                }
+                return match;
+            });
+        }
+
         promptOutput.value = finalContent;
     } else {
         // Clear current content
