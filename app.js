@@ -16,6 +16,7 @@ const HTML_ESCAPE_CHECK_REGEX = /[&<>'"]/;
 const HTML_ESCAPE_REGEX = /[&<>'"]/g;
 
 
+// Helper to escape HTML and prevent XSS
 function escapeHTML(str) {
     if (!str) return str;
     if (!HTML_ESCAPE_REGEX.test(str)) return str;
