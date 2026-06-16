@@ -179,9 +179,7 @@ function renderForm() {
 
 // Update Textarea Output
 function updateOutput() {
-    if (!currentPrompt) return;
-
-    if (!promptOutput) return;
+    if (!currentPrompt || !promptOutput) return;
 
     if (promptOutput.tagName === 'TEXTAREA') {
         let finalContent = currentPrompt.content;
