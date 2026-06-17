@@ -33,7 +33,6 @@ function renderSidebar(categories, filterText = '') {
 
     const fragment = document.createDocumentFragment();
     const filterTextLower = filterText.toLowerCase();
-    const fragment = document.createDocumentFragment();
 
     const categoriesLength = categories.length;
     for (let i = 0; i < categoriesLength; i++) {
@@ -203,6 +202,9 @@ function renderForm() {
 function updateOutput() {
     if (!currentPrompt || !promptOutput) return;
 
+    const content = currentPrompt.content || '';
+    const isTextarea = promptOutput.tagName.toLowerCase() === 'textarea';
+
     if (isTextarea) {
         let result = content;
         variables.forEach(v => {
@@ -239,6 +241,7 @@ function updateOutput() {
             const span = document.createElement('span');
             const variable = match.variable;
             const input = variable.inputElement;
+            const isFilled = input && input.value.trim() !== '';
 
             if (isFilled) {
                 span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
