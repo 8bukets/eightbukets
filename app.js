@@ -1,9 +1,19 @@
 let sidebarContent, searchInput, welcomeMessage, promptWorkspace, promptCategory, promptTitle, dynamicForm, promptOutput, copyBtn, copyToast, noVariablesMsg;
 
 let promptsData = [];
-let promptsLookup = new Map();
+let promptsMap = new Map();
 let currentPrompt = null;
 let variables = [];
+
+function escapeHTML(str) {
+    if (!str) return str;
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&#39;')
+        .replace(/"/g, '&quot;');
+}
 
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
@@ -11,6 +21,9 @@ function renderSidebar(categories, filterText = '') {
     sidebarContent.textContent = '';
 
     // Clear sidebar content before rendering
+    sidebarContent.textContent = '';
+
+    // Clear efficiently
     sidebarContent.textContent = '';
 
     const fragment = document.createDocumentFragment();
@@ -325,12 +338,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!btn) return;
 
             const promptId = btn.dataset.promptId;
-            const categoryName = btn.dataset.categoryName;
 
-            // Find prompt in promptsLookup for O(1) access
-            const prompt = promptsLookup.get(`${categoryName}:${promptId}`);
-            if (prompt) {
-                selectPrompt(prompt, categoryName);
+            // Find prompt in promptsMap for O(1) access
+            const promptData = promptsMap.get(String(promptId));
+            if (promptData) {
+                selectPrompt(promptData.prompt, promptData.categoryName);
             }
         });
     }
@@ -364,10 +376,12 @@ if (typeof module !== 'undefined' && module.exports) {
         updateOutput,
         setPromptsData: (data) => {
             promptsData = data;
-            promptsLookup.clear();
+            promptsMap.clear();
             promptsData.forEach(category => {
                 category.prompts.forEach(prompt => {
-                    promptsLookup.set(`${category.name}:${prompt.id}`, prompt);
+                    if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
+                    if (prompt.content) prompt.contentLower = prompt.content.toLowerCase();
+                    promptsMap.set(String(prompt.id), { prompt, categoryName: category.name });
                 });
             });
         },
