@@ -4,11 +4,15 @@ let promptsData = [];
 let promptsLookup = new Map();
 let currentPrompt = null;
 let variables = [];
+let combinedVariableRegex = null;
+let variablesMap = new Map();
+let promptsMap = new Map();
 
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
 
+    sidebarContent.textContent = '';
     const fragment = document.createDocumentFragment();
     const filterTextLower = filterText.toLowerCase();
 
@@ -70,6 +74,18 @@ function renderSidebar(categories, filterText = '') {
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VAR_SEPARATOR_REGEX = /[—:]/;
 
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+};
+
+function escapeHTML(str) {
+    return str.replace(/[&<>"']/g, m => HTML_ESCAPE_MAP[m]);
+}
+
 function parseVariables(content) {
     if (!content) {
         variables = [];
@@ -99,9 +115,9 @@ function parseVariables(content) {
         }
 
         if (separator) {
-            const parts = rawVar.split(separator);
-            varName = parts[0].trim();
-            varHint = parts[1].trim();
+            const index = rawVar.indexOf(separator);
+            varName = rawVar.substring(0, index).trim();
+            varHint = rawVar.substring(index + 1).trim();
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
@@ -113,6 +129,22 @@ function parseVariables(content) {
         });
     }
     variables = localVariables;
+
+    if (variables.length > 0) {
+        variablesMap.clear();
+        const patterns = variables.map(v => {
+            variablesMap.set(v.raw, v);
+            const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
+            return `\\[${escaped}\\]`;
+        });
+        // Sort by length descending to match longest possible variable first if they overlap
+        patterns.sort((a, b) => b.length - a.length);
+        combinedVariableRegex = new RegExp(patterns.join('|'), 'g');
+    } else {
+        combinedVariableRegex = null;
+        variablesMap.clear();
+    }
+
     return localVariables;
 }
 
@@ -191,52 +223,49 @@ function updateOutput() {
     const content = currentPrompt.content || '';
     const isTextarea = promptOutput.tagName.toLowerCase() === 'textarea';
 
+    if (!combinedVariableRegex) {
+        if (isTextarea) {
+            promptOutput.value = content;
+        } else {
+            promptOutput.innerHTML = escapeHTML(content);
+        }
+        return;
+    }
+
     if (isTextarea) {
-        let result = content;
-        variables.forEach(v => {
-            const val = (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
-            result = result.replace(v.replaceRegex, () => val);
+        combinedVariableRegex.lastIndex = 0;
+        promptOutput.value = content.replace(combinedVariableRegex, (match) => {
+            const raw = match.substring(1, match.length - 1);
+            const v = variablesMap.get(raw);
+            return (v && v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : match;
         });
-        promptOutput.value = result;
     } else {
-        let matches = [];
-        variables.forEach(variable => {
-            let match;
-            const regex = new RegExp(variable.replaceRegex.source, 'g');
-            while ((match = regex.exec(content)) !== null) {
-                matches.push({
-                    start: match.index,
-                    end: match.index + match[0].length,
-                    variable: variable
-                });
-            }
-        });
-
-        matches.sort((a, b) => a.start - b.start);
-
         let htmlResult = '';
         let lastIndex = 0;
-        matches.forEach(match => {
-            if (match.start < lastIndex) return;
+        let match;
 
-            if (match.start > lastIndex) {
-                htmlResult += escapeHTML(content.substring(lastIndex, match.start));
+        combinedVariableRegex.lastIndex = 0;
+        while ((match = combinedVariableRegex.exec(content)) !== null) {
+            if (match.index > lastIndex) {
+                htmlResult += escapeHTML(content.substring(lastIndex, match.index));
             }
 
-            const variable = match.variable;
-            const input = variable.inputElement;
+            const raw = match[0].substring(1, match[0].length - 1);
+            const variable = variablesMap.get(raw);
+            const input = variable ? variable.inputElement : null;
             const isFilled = input && input.value.trim() !== '';
 
             if (isFilled) {
                 htmlResult += `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapeHTML(input.value)}</span>`;
-            } else {
+            } else if (variable) {
                 htmlResult += `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${escapeHTML(variable.raw)}]</span>`;
+            } else {
+                htmlResult += escapeHTML(match[0]);
             }
 
-            lastIndex = match.end;
-        });
+            lastIndex = combinedVariableRegex.lastIndex;
+        }
 
-        // Add remaining text
         if (lastIndex < content.length) {
             htmlResult += escapeHTML(content.substring(lastIndex));
         }
