@@ -1,6 +1,7 @@
 let sidebarContent, searchInput, welcomeMessage, promptWorkspace, promptCategory, promptTitle, dynamicForm, promptOutput, copyBtn, copyToast, noVariablesMsg;
 
 let promptsData = [];
+let promptsLookup = new Map();
 let currentPrompt = null;
 let variables = [];
 
@@ -288,6 +289,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         promptsData = data.categories;
+
+        // Build lookup map for O(1) access
+        promptsLookup.clear();
+        promptsData.forEach(category => {
+            category.prompts.forEach(prompt => {
+                promptsLookup.set(`${category.name}:${prompt.id}`, prompt);
+            });
+        });
+
         renderSidebar(promptsData);
     } catch (error) {
         console.error('Error loading prompts:', error);
@@ -315,19 +325,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const promptId = btn.dataset.promptId;
             const categoryName = btn.dataset.categoryName;
 
-            // Find prompt in promptsData
-            for (let i = 0; i < promptsData.length; i++) {
-                const category = promptsData[i];
-                if (category.name === categoryName) {
-                    const prompts = category.prompts;
-                    for (let j = 0; j < prompts.length; j++) {
-                        const prompt = prompts[j];
-                        if (String(prompt.id) === String(promptId)) {
-                            selectPrompt(prompt, categoryName);
-                            return;
-                        }
-                    }
-                }
+            // Find prompt in promptsLookup for O(1) access
+            const prompt = promptsLookup.get(`${categoryName}:${promptId}`);
+            if (prompt) {
+                selectPrompt(prompt, categoryName);
             }
         });
     }
@@ -360,7 +361,15 @@ if (typeof module !== 'undefined' && module.exports) {
         selectPrompt,
         renderForm,
         updateOutput,
-        setPromptsData: (data) => promptsData = data,
+        setPromptsData: (data) => {
+            promptsData = data;
+            promptsLookup.clear();
+            promptsData.forEach(category => {
+                category.prompts.forEach(prompt => {
+                    promptsLookup.set(`${category.name}:${prompt.id}`, prompt);
+                });
+            });
+        },
         setCurrentPrompt: (prompt) => currentPrompt = prompt,
         getCurrentPrompt: () => currentPrompt,
         setSearchInput: (el) => searchInput = el,
