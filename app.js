@@ -91,6 +91,7 @@ function renderSidebar(categories, filterText = '') {
 
 // Pre-compile RegExp to avoid recreation inside loops
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
+const VAR_SEPARATOR_REGEX = /[—:]/;
 
 function parseVariables(content) {
     if (!content) {
