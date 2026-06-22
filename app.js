@@ -90,6 +90,7 @@ function renderSidebar(categories, filterText = '') {
 
 // Pre-compile RegExp to avoid recreation inside loops
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
+const VAR_SEPARATOR_REGEX = /[—:]/;
 
 function parseVariables(content) {
     if (!content) {
@@ -111,11 +112,10 @@ function parseVariables(content) {
 
         let varName = rawVar;
         let varHint = "";
-        const separator = ['—', ':'].find(s => rawVar.includes(s));
-        if (separator) {
-            const parts = rawVar.split(separator);
-            varName = parts[0].trim();
-            varHint = parts[1].trim();
+        const sepIndex = rawVar.search(VAR_SEPARATOR_REGEX);
+        if (sepIndex !== -1) {
+            varName = rawVar.substring(0, sepIndex).trim();
+            varHint = rawVar.substring(sepIndex + 1).trim();
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
