@@ -1,13 +1,30 @@
 let sidebarContent, searchInput, welcomeMessage, promptWorkspace, promptCategory, promptTitle, dynamicForm, promptOutput, copyBtn, copyToast, noVariablesMsg;
 
 let promptsData = [];
-let promptsLookup = new Map();
+let promptsMap = new Map();
 let currentPrompt = null;
 let variables = [];
+
+function escapeHTML(str) {
+    if (!str) return str;
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&#39;')
+        .replace(/"/g, '&quot;');
+}
 
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
+    sidebarContent.textContent = '';
+
+    // Clear sidebar content before rendering
+    sidebarContent.textContent = '';
+
+    // Clear efficiently
+    sidebarContent.textContent = '';
 
     const fragment = document.createDocumentFragment();
     const filterTextLower = filterText.toLowerCase();
@@ -69,8 +86,6 @@ function renderSidebar(categories, filterText = '') {
 
 // Pre-compile RegExp to avoid recreation inside loops
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
-const VAR_SEPARATOR_REGEX = /[—:]/;
-const VAR_REGEX = /\[(.*?)\]/g;
 
 const HTML_ESCAPE_MAP = {
     '&': '&amp;',
@@ -80,14 +95,12 @@ const HTML_ESCAPE_MAP = {
     "'": '&#39;'
 };
 const HTML_ESCAPE_REGEX = /[&<>"']/g;
+const HTML_ESCAPE_CHECK_REGEX = /[&<>"']/;
 
 function escapeHTML(str) {
-    if (!str) return '';
-    // Fast path: if no special characters, return as is
-    if (!str.includes('&') && !str.includes('<') && !str.includes('>') && !str.includes('"') && !str.includes("'")) {
-        return str;
-    }
-    return str.replace(HTML_ESCAPE_REGEX, (s) => HTML_ESCAPE_MAP[s]);
+    if (!str) return str;
+    if (!HTML_ESCAPE_CHECK_REGEX.test(str)) return str;
+    return str.replace(HTML_ESCAPE_REGEX, (char) => HTML_ESCAPE_MAP[char]);
 }
 
 function parseVariables(content) {
@@ -111,12 +124,17 @@ function parseVariables(content) {
         let varName = rawVar;
         let varHint = "";
 
-        const sepIndex = rawVar.search(VAR_SEPARATOR_REGEX);
-        if (sepIndex !== -1) {
-            const separator = rawVar[sepIndex];
-            const parts = rawVar.split(separator);
-            varName = parts[0].trim();
-            varHint = parts.slice(1).join(separator).trim();
+        let separator = null;
+        if (rawVar.includes('—')) {
+            separator = '—';
+        } else if (rawVar.includes(':')) {
+            separator = ':';
+        }
+
+        if (separator) {
+            const index = rawVar.indexOf(separator);
+            varName = rawVar.substring(0, index).trim();
+            varHint = rawVar.substring(index + 1).trim();
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
@@ -221,42 +239,41 @@ function updateOutput() {
             }
             return match;
         });
-    } else {
-        let htmlResult = '';
+
+        matches.sort((a, b) => a.start - b.start);
+
+        // Clear efficiently
+        promptOutput.textContent = '';
+        const fragment = document.createDocumentFragment();
+
         let lastIndex = 0;
 
-        VAR_REGEX.lastIndex = 0;
-        let match;
-        while ((match = VAR_REGEX.exec(content)) !== null) {
-            const raw = match[1];
-            const start = match.index;
-            const end = start + match[0].length;
-            const variable = varMap.get(raw);
-
-            if (!variable) continue;
-
-            if (start > lastIndex) {
-                htmlResult += escapeHTML(content.substring(lastIndex, start));
+            if (match.start > lastIndex) {
+                fragment.appendChild(document.createTextNode(content.substring(lastIndex, match.start)));
             }
 
             const input = variable.inputElement;
             const isFilled = input && input.value.trim() !== '';
 
+            const span = document.createElement('span');
             if (isFilled) {
-                htmlResult += `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapeHTML(input.value)}</span>`;
+                span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
+                span.textContent = input.value;
             } else {
-                htmlResult += `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${escapeHTML(variable.raw)}]</span>`;
+                span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
+                span.textContent = `[${variable.raw}]`;
             }
+            fragment.appendChild(span);
 
             lastIndex = end;
         }
 
         // Add remaining text
         if (lastIndex < content.length) {
-            htmlResult += escapeHTML(content.substring(lastIndex));
+            fragment.appendChild(document.createTextNode(content.substring(lastIndex)));
         }
 
-        promptOutput.innerHTML = htmlResult;
+        promptOutput.appendChild(fragment);
     }
 }
 
@@ -278,6 +295,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const response = await fetch('prompts.json');
         const data = await response.json();
 
+        // Build lookup map for O(1) access
+        promptsLookup.clear();
         data.categories.forEach(category => {
             category.prompts.forEach(prompt => {
                 if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
@@ -286,14 +305,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         promptsData = data.categories;
-
-        // Build lookup map for O(1) access
-        promptsLookup.clear();
-        promptsData.forEach(category => {
-            category.prompts.forEach(prompt => {
-                promptsLookup.set(`${category.name}:${prompt.id}`, prompt);
-            });
-        });
 
         renderSidebar(promptsData);
     } catch (error) {
@@ -320,12 +331,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!btn) return;
 
             const promptId = btn.dataset.promptId;
-            const categoryName = btn.dataset.categoryName;
 
-            // Find prompt in promptsLookup for O(1) access
-            const prompt = promptsLookup.get(`${categoryName}:${promptId}`);
-            if (prompt) {
-                selectPrompt(prompt, categoryName);
+            // Find prompt in promptsMap for O(1) access
+            const promptData = promptsMap.get(String(promptId));
+            if (promptData) {
+                selectPrompt(promptData.prompt, promptData.categoryName);
             }
         });
     }
@@ -359,10 +369,12 @@ if (typeof module !== 'undefined' && module.exports) {
         updateOutput,
         setPromptsData: (data) => {
             promptsData = data;
-            promptsLookup.clear();
+            promptsMap.clear();
             promptsData.forEach(category => {
                 category.prompts.forEach(prompt => {
-                    promptsLookup.set(`${category.name}:${prompt.id}`, prompt);
+                    if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
+                    if (prompt.content) prompt.contentLower = prompt.content.toLowerCase();
+                    promptsMap.set(String(prompt.id), { prompt, categoryName: category.name });
                 });
             });
         },
