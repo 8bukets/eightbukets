@@ -80,6 +80,7 @@ function renderSidebar(categories, filterText = '') {
         fragment.appendChild(categoryDiv);
     }
 
+    sidebarContent.textContent = '';
     sidebarContent.appendChild(fragment);
 }
 
@@ -107,12 +108,12 @@ function parseVariables(content) {
         variables = [];
         return [];
     }
-    const regex = /\[(.*?)\]/g;
     const localVariables = [];
     const seenVars = new Set();
     let match;
 
-    while ((match = regex.exec(content)) !== null) {
+    VAR_REGEX.lastIndex = 0;
+    while ((match = VAR_REGEX.exec(content)) !== null) {
         const rawVar = match[1];
 
         if (seenVars.has(rawVar)) {
@@ -223,25 +224,20 @@ function updateOutput() {
     const content = currentPrompt.content || '';
     const isTextarea = promptOutput.tagName.toLowerCase() === 'textarea';
 
+    // Optimization: Create a map for quick variable lookup
+    const varMap = new Map();
+    variables.forEach(v => {
+        varMap.set(v.raw, v);
+    });
+
     if (isTextarea) {
-        let result = content;
-        variables.forEach(v => {
-            const val = (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
-            result = result.replace(v.replaceRegex, () => val);
-        });
-        promptOutput.value = result;
-    } else {
-        let matches = [];
-        variables.forEach(variable => {
-            let match;
-            const regex = new RegExp(variable.replaceRegex.source, 'g');
-            while ((match = regex.exec(content)) !== null) {
-                matches.push({
-                    start: match.index,
-                    end: match.index + match[0].length,
-                    variable: variable
-                });
+        // Single pass replacement
+        promptOutput.value = content.replace(VAR_REGEX, (match, raw) => {
+            const v = varMap.get(raw);
+            if (v) {
+                return (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
             }
+            return match;
         });
 
         matches.sort((a, b) => a.start - b.start);
@@ -251,14 +247,11 @@ function updateOutput() {
         const fragment = document.createDocumentFragment();
 
         let lastIndex = 0;
-        matches.forEach(match => {
-            if (match.start < lastIndex) return;
 
             if (match.start > lastIndex) {
                 fragment.appendChild(document.createTextNode(content.substring(lastIndex, match.start)));
             }
 
-            const variable = match.variable;
             const input = variable.inputElement;
             const isFilled = input && input.value.trim() !== '';
 
@@ -272,8 +265,8 @@ function updateOutput() {
             }
             fragment.appendChild(span);
 
-            lastIndex = match.end;
-        });
+            lastIndex = end;
+        }
 
         // Add remaining text
         if (lastIndex < content.length) {
