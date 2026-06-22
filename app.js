@@ -5,9 +5,22 @@ let promptsLookup = new Map();
 let currentPrompt = null;
 let variables = [];
 
+// Helper to escape HTML and prevent XSS
+function escapeHTML(str) {
+    if (!str) return str;
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&#39;')
+        .replace(/"/g, '&quot;');
+}
+
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
+
+    sidebarContent.textContent = '';
 
     const fragment = document.createDocumentFragment();
     const filterTextLower = filterText.toLowerCase();
@@ -91,7 +104,7 @@ function parseVariables(content) {
         let varName = rawVar;
         let varHint = "";
 
-        let separator = null;
+        let separator;
         if (rawVar.includes('—')) {
             separator = '—';
         } else if (rawVar.includes(':')) {
@@ -99,9 +112,9 @@ function parseVariables(content) {
         }
 
         if (separator) {
-            const parts = rawVar.split(separator);
-            varName = parts[0].trim();
-            varHint = parts[1].trim();
+            const separatorIndex = rawVar.indexOf(separator);
+            varName = rawVar.substring(0, separatorIndex).trim();
+            varHint = rawVar.substring(separatorIndex + 1).trim();
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
@@ -267,7 +280,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             category.prompts.forEach(prompt => {
                 if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
                 if (prompt.content) prompt.contentLower = prompt.content.toLowerCase();
-                promptsMap.set(String(prompt.id), { prompt, categoryName: category.name });
             });
         });
 
@@ -338,6 +350,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+        escapeHTML,
         renderSidebar,
         parseVariables,
         selectPrompt,
