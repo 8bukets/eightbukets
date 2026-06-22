@@ -285,6 +285,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             category.prompts.forEach(prompt => {
                 if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
                 if (prompt.content) prompt.contentLower = prompt.content.toLowerCase();
+                promptsMap.set(String(prompt.id), { prompt, categoryName: category.name });
             });
         });
 
