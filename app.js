@@ -1,7 +1,7 @@
 let sidebarContent, searchInput, welcomeMessage, promptWorkspace, promptCategory, promptTitle, dynamicForm, promptOutput, copyBtn, copyToast, noVariablesMsg;
 
 let promptsData = [];
-let promptsMap = new Map();
+let promptsLookup = new Map();
 let currentPrompt = null;
 let variables = [];
 
@@ -290,6 +290,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         promptsData = data.categories;
+
+        // Build lookup map for O(1) access
+        promptsLookup.clear();
+        promptsData.forEach(category => {
+            category.prompts.forEach(prompt => {
+                promptsLookup.set(`${category.name}:${prompt.id}`, prompt);
+            });
+        });
+
         renderSidebar(promptsData);
     } catch (error) {
         console.error('Error loading prompts:', error);
@@ -315,9 +324,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!btn) return;
 
             const promptId = btn.dataset.promptId;
-            const entry = promptsMap.get(String(promptId));
-            if (entry) {
-                selectPrompt(entry.prompt, entry.categoryName);
+            const categoryName = btn.dataset.categoryName;
+
+            // Find prompt in promptsLookup for O(1) access
+            const prompt = promptsLookup.get(`${categoryName}:${promptId}`);
+            if (prompt) {
+                selectPrompt(prompt, categoryName);
             }
         });
     }
@@ -350,7 +362,15 @@ if (typeof module !== 'undefined' && module.exports) {
         selectPrompt,
         renderForm,
         updateOutput,
-        setPromptsData: (data) => promptsData = data,
+        setPromptsData: (data) => {
+            promptsData = data;
+            promptsLookup.clear();
+            promptsData.forEach(category => {
+                category.prompts.forEach(prompt => {
+                    promptsLookup.set(`${category.name}:${prompt.id}`, prompt);
+                });
+            });
+        },
         setCurrentPrompt: (prompt) => currentPrompt = prompt,
         getCurrentPrompt: () => currentPrompt,
         setSearchInput: (el) => searchInput = el,
