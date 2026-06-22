@@ -1,6 +1,7 @@
 let sidebarContent, searchInput, welcomeMessage, promptWorkspace, promptCategory, promptTitle, dynamicForm, promptOutput, copyBtn, copyToast, noVariablesMsg;
 
 let promptsData = [];
+let promptsMap = new Map();
 let currentPrompt = null;
 let variables = [];
 
@@ -128,6 +129,22 @@ function parseVariables(content) {
     }
     variables = localVariables;
     return localVariables;
+}
+
+function rebuildPromptsMap() {
+    promptsMap.clear();
+    if (!promptsData) return;
+    for (let i = 0; i < promptsData.length; i++) {
+        const category = promptsData[i];
+        if (!category || !category.prompts) continue;
+        const prompts = category.prompts;
+        for (let j = 0; j < prompts.length; j++) {
+            const prompt = prompts[j];
+            if (prompt) {
+                promptsMap.set(`${category.name}|${prompt.id}`, prompt);
+            }
+        }
+    }
 }
 
 // Select a prompt
@@ -288,6 +305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         promptsData = data.categories;
+        rebuildPromptsMap();
         renderSidebar(promptsData);
     } catch (error) {
         console.error('Error loading prompts:', error);
@@ -315,19 +333,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const promptId = btn.dataset.promptId;
             const categoryName = btn.dataset.categoryName;
 
-            // Find prompt in promptsData
-            for (let i = 0; i < promptsData.length; i++) {
-                const category = promptsData[i];
-                if (category.name === categoryName) {
-                    const prompts = category.prompts;
-                    for (let j = 0; j < prompts.length; j++) {
-                        const prompt = prompts[j];
-                        if (String(prompt.id) === String(promptId)) {
-                            selectPrompt(prompt, categoryName);
-                            return;
-                        }
-                    }
-                }
+            // Find prompt in promptsMap
+            const prompt = promptsMap.get(`${categoryName}|${promptId}`);
+            if (prompt) {
+                selectPrompt(prompt, categoryName);
             }
         });
     }
@@ -360,7 +369,10 @@ if (typeof module !== 'undefined' && module.exports) {
         selectPrompt,
         renderForm,
         updateOutput,
-        setPromptsData: (data) => promptsData = data,
+        setPromptsData: (data) => {
+            promptsData = data;
+            rebuildPromptsMap();
+        },
         setCurrentPrompt: (prompt) => currentPrompt = prompt,
         getCurrentPrompt: () => currentPrompt,
         setSearchInput: (el) => searchInput = el,
