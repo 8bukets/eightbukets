@@ -10,9 +10,6 @@ function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
     sidebarContent.textContent = '';
 
-    // Clear efficiently
-    sidebarContent.textContent = '';
-
     const fragment = document.createDocumentFragment();
     const filterTextLower = filterText.toLowerCase();
 
