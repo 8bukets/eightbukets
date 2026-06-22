@@ -112,7 +112,14 @@ function parseVariables(content) {
 
         let varName = rawVar;
         let varHint = "";
-        const separator = ['—', ':'].find(s => rawVar.includes(s));
+
+        let separator = null;
+        if (rawVar.includes('—')) {
+            separator = '—';
+        } else if (rawVar.includes(':')) {
+            separator = ':';
+        }
+
         if (separator) {
             const parts = rawVar.split(separator);
             varName = parts[0].trim();
