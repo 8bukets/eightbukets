@@ -34,6 +34,70 @@ You are a viral content writer for X/Twitter.
         result = parse_prompts(mock_data)
         self.assertEqual(result, expected)
 
+    def test_parse_prompts_robustness(self):
+        # Testing how it handles unexpected formatting
+        mock_data = """
+Part 1: Robustness Test (Prompts 1–5)
+
+Prompt 1 — Normal Prompt
+Content 1
+
+Prompt 2 - Hyphen instead of em-dash
+Content 2
+
+   Prompt 3 — Leading spaces
+Content 3
+
+Prompt 4 — Multiple — em-dashes
+Content 4
+
+Prompt 5 — Nested Header
+Content 5 with a fake Prompt 6 — Header in it.
+"""
+        # Based on current regex r'Prompt (\d+) — (.*)'
+        # Prompt 2 will be MISSED because it uses a hyphen.
+        # Prompt 3 should be FOUND because regex is not anchored.
+        # Prompt 4 should have "Multiple — em-dashes" as title because (.*) is greedy.
+        # Prompt 6 will be FOUND as a separate prompt if it matches exactly.
+
+        expected = {
+            "categories": [
+                {
+                    "name": "Robustness Test",
+                    "prompts": [
+                        {
+                            "id": 1,
+                            "title": "Normal Prompt",
+                            "content": "Content 1\n\nPrompt 2 - Hyphen instead of em-dash\nContent 2"
+                        },
+                        # id 2 missed
+                        {
+                            "id": 3,
+                            "title": "Leading spaces",
+                            "content": "Content 3"
+                        },
+                        {
+                            "id": 4,
+                            "title": "Multiple — em-dashes",
+                            "content": "Content 4"
+                        },
+                        {
+                            "id": 5,
+                            "title": "Nested Header",
+                            "content": "Content 5 with a fake"
+                        },
+                        {
+                            "id": 6,
+                            "title": "Header in it.",
+                            "content": ""
+                        }
+                    ]
+                }
+            ]
+        }
+        result = parse_prompts(mock_data)
+        self.assertEqual(result, expected)
+
     def test_parse_prompts_multiple_categories(self):
         mock_data = """
 Part 1: Content Creation (Prompts 1–10)
