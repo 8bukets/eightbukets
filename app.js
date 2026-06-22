@@ -63,24 +63,44 @@ function renderSidebar(categories, filterText = '') {
         fragment.appendChild(categoryDiv);
     }
 
+    sidebarContent.textContent = '';
     sidebarContent.appendChild(fragment);
 }
 
 // Pre-compile RegExp to avoid recreation inside loops
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VAR_SEPARATOR_REGEX = /[—:]/;
+const VAR_REGEX = /\[(.*?)\]/g;
+
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+};
+const HTML_ESCAPE_REGEX = /[&<>"']/g;
+
+function escapeHTML(str) {
+    if (!str) return '';
+    // Fast path: if no special characters, return as is
+    if (!str.includes('&') && !str.includes('<') && !str.includes('>') && !str.includes('"') && !str.includes("'")) {
+        return str;
+    }
+    return str.replace(HTML_ESCAPE_REGEX, (s) => HTML_ESCAPE_MAP[s]);
+}
 
 function parseVariables(content) {
     if (!content) {
         variables = [];
         return [];
     }
-    const regex = /\[(.*?)\]/g;
     const localVariables = [];
     const seenVars = new Set();
     let match;
 
-    while ((match = regex.exec(content)) !== null) {
+    VAR_REGEX.lastIndex = 0;
+    while ((match = VAR_REGEX.exec(content)) !== null) {
         const rawVar = match[1];
 
         if (seenVars.has(rawVar)) {
@@ -91,17 +111,12 @@ function parseVariables(content) {
         let varName = rawVar;
         let varHint = "";
 
-        let separator = null;
-        if (rawVar.includes('—')) {
-            separator = '—';
-        } else if (rawVar.includes(':')) {
-            separator = ':';
-        }
-
-        if (separator) {
+        const sepIndex = rawVar.search(VAR_SEPARATOR_REGEX);
+        if (sepIndex !== -1) {
+            const separator = rawVar[sepIndex];
             const parts = rawVar.split(separator);
             varName = parts[0].trim();
-            varHint = parts[1].trim();
+            varHint = parts.slice(1).join(separator).trim();
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
@@ -191,39 +206,39 @@ function updateOutput() {
     const content = currentPrompt.content || '';
     const isTextarea = promptOutput.tagName.toLowerCase() === 'textarea';
 
+    // Optimization: Create a map for quick variable lookup
+    const varMap = new Map();
+    variables.forEach(v => {
+        varMap.set(v.raw, v);
+    });
+
     if (isTextarea) {
-        let result = content;
-        variables.forEach(v => {
-            const val = (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
-            result = result.replace(v.replaceRegex, () => val);
-        });
-        promptOutput.value = result;
-    } else {
-        let matches = [];
-        variables.forEach(variable => {
-            let match;
-            const regex = new RegExp(variable.replaceRegex.source, 'g');
-            while ((match = regex.exec(content)) !== null) {
-                matches.push({
-                    start: match.index,
-                    end: match.index + match[0].length,
-                    variable: variable
-                });
+        // Single pass replacement
+        promptOutput.value = content.replace(VAR_REGEX, (match, raw) => {
+            const v = varMap.get(raw);
+            if (v) {
+                return (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
             }
+            return match;
         });
-
-        matches.sort((a, b) => a.start - b.start);
-
+    } else {
         let htmlResult = '';
         let lastIndex = 0;
-        matches.forEach(match => {
-            if (match.start < lastIndex) return;
 
-            if (match.start > lastIndex) {
-                htmlResult += escapeHTML(content.substring(lastIndex, match.start));
+        VAR_REGEX.lastIndex = 0;
+        let match;
+        while ((match = VAR_REGEX.exec(content)) !== null) {
+            const raw = match[1];
+            const start = match.index;
+            const end = start + match[0].length;
+            const variable = varMap.get(raw);
+
+            if (!variable) continue;
+
+            if (start > lastIndex) {
+                htmlResult += escapeHTML(content.substring(lastIndex, start));
             }
 
-            const variable = match.variable;
             const input = variable.inputElement;
             const isFilled = input && input.value.trim() !== '';
 
@@ -233,8 +248,8 @@ function updateOutput() {
                 htmlResult += `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${escapeHTML(variable.raw)}]</span>`;
             }
 
-            lastIndex = match.end;
-        });
+            lastIndex = end;
+        }
 
         // Add remaining text
         if (lastIndex < content.length) {
@@ -267,7 +282,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             category.prompts.forEach(prompt => {
                 if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
                 if (prompt.content) prompt.contentLower = prompt.content.toLowerCase();
-                promptsMap.set(String(prompt.id), { prompt, categoryName: category.name });
             });
         });
 
