@@ -9,6 +9,9 @@ let variables = [];
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
 
+    // Clear sidebar content before rendering
+    sidebarContent.textContent = '';
+
     const fragment = document.createDocumentFragment();
     const filterTextLower = filterText.toLowerCase();
 
@@ -70,6 +73,22 @@ function renderSidebar(categories, filterText = '') {
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VAR_SEPARATOR_REGEX = /[—:]/;
 
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+};
+const HTML_ESCAPE_REGEX = /[&<>"']/g;
+const HTML_ESCAPE_CHECK_REGEX = /[&<>"']/;
+
+function escapeHTML(str) {
+    if (!str) return str;
+    if (!HTML_ESCAPE_CHECK_REGEX.test(str)) return str;
+    return str.replace(HTML_ESCAPE_REGEX, (char) => HTML_ESCAPE_MAP[char]);
+}
+
 function parseVariables(content) {
     if (!content) {
         variables = [];
@@ -99,9 +118,9 @@ function parseVariables(content) {
         }
 
         if (separator) {
-            const parts = rawVar.split(separator);
-            varName = parts[0].trim();
-            varHint = parts[1].trim();
+            const index = rawVar.indexOf(separator);
+            varName = rawVar.substring(0, index).trim();
+            varHint = rawVar.substring(index + 1).trim();
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
@@ -263,23 +282,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         const response = await fetch('prompts.json');
         const data = await response.json();
 
+        // Build lookup map for O(1) access
+        promptsLookup.clear();
         data.categories.forEach(category => {
             category.prompts.forEach(prompt => {
                 if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
                 if (prompt.content) prompt.contentLower = prompt.content.toLowerCase();
-                promptsMap.set(String(prompt.id), { prompt, categoryName: category.name });
+                promptsLookup.set(`${category.name}:${prompt.id}`, prompt);
             });
         });
 
         promptsData = data.categories;
-
-        // Build lookup map for O(1) access
-        promptsLookup.clear();
-        promptsData.forEach(category => {
-            category.prompts.forEach(prompt => {
-                promptsLookup.set(`${category.name}:${prompt.id}`, prompt);
-            });
-        });
 
         renderSidebar(promptsData);
     } catch (error) {
