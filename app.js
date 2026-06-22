@@ -1,6 +1,7 @@
 let sidebarContent, searchInput, welcomeMessage, promptWorkspace, promptCategory, promptTitle, dynamicForm, promptOutput, copyBtn, copyToast, noVariablesMsg;
 
 let promptsData = [];
+let promptsMap = new Map();
 let currentPrompt = null;
 let variables = [];
 
@@ -284,6 +285,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             category.prompts.forEach(prompt => {
                 if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
                 if (prompt.content) prompt.contentLower = prompt.content.toLowerCase();
+                promptsMap.set(String(prompt.id), { prompt, categoryName: category.name });
             });
         });
 
@@ -313,21 +315,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!btn) return;
 
             const promptId = btn.dataset.promptId;
-            const categoryName = btn.dataset.categoryName;
-
-            // Find prompt in promptsData
-            for (let i = 0; i < promptsData.length; i++) {
-                const category = promptsData[i];
-                if (category.name === categoryName) {
-                    const prompts = category.prompts;
-                    for (let j = 0; j < prompts.length; j++) {
-                        const prompt = prompts[j];
-                        if (String(prompt.id) === String(promptId)) {
-                            selectPrompt(prompt, categoryName);
-                            return;
-                        }
-                    }
-                }
+            const entry = promptsMap.get(String(promptId));
+            if (entry) {
+                selectPrompt(entry.prompt, entry.categoryName);
             }
         });
     }
