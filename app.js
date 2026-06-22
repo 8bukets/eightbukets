@@ -5,25 +5,6 @@ let promptsLookup = new Map();
 let currentPrompt = null;
 let variables = [];
 
-// Pre-compute maps and regexes for performance
-const HTML_ESCAPE_MAP = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    "'": '&#39;',
-    '"': '&quot;'
-};
-const HTML_ESCAPE_CHECK_REGEX = /[&<>'"]/;
-const HTML_ESCAPE_REGEX = /[&<>'"]/g;
-
-
-// Helper to escape HTML and prevent XSS
-function escapeHTML(str) {
-    if (!str) return str;
-    if (!HTML_ESCAPE_CHECK_REGEX.test(str)) return str;
-    return str.replace(HTML_ESCAPE_REGEX, (char) => HTML_ESCAPE_MAP[char]);
-}
-
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
@@ -364,7 +345,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        escapeHTML,
         renderSidebar,
         parseVariables,
         selectPrompt,
