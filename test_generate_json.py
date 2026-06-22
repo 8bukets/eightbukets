@@ -110,5 +110,16 @@ This is some content. How to Get Maximum Value From This Collection More content
         result = parse_prompts(mock_data)
         self.assertEqual(result, expected)
 
+    def test_parse_prompts_path_traversal(self):
+        # Test that path traversal raises PermissionError
+        with self.assertRaises(PermissionError) as cm:
+            parse_prompts(filename='../traversal.txt')
+        self.assertIn("Access denied: Path traversal detected", str(cm.exception))
+
+    def test_parse_prompts_file_not_found(self):
+        # Test that a non-existent but safe path raises FileNotFoundError
+        with self.assertRaises(FileNotFoundError):
+            parse_prompts(filename='non_existent_file_12345.txt')
+
 if __name__ == '__main__':
     unittest.main()

@@ -1,6 +1,7 @@
 let sidebarContent, searchInput, welcomeMessage, promptWorkspace, promptCategory, promptTitle, dynamicForm, promptOutput, copyBtn, copyToast, noVariablesMsg;
 
 let promptsData = [];
+let promptsLookup = new Map();
 let currentPrompt = null;
 let variables = [];
 
@@ -112,10 +113,18 @@ function parseVariables(content) {
 
         let varName = rawVar;
         let varHint = "";
-        const sepIndex = rawVar.search(VAR_SEPARATOR_REGEX);
-        if (sepIndex !== -1) {
-            varName = rawVar.substring(0, sepIndex).trim();
-            varHint = rawVar.substring(sepIndex + 1).trim();
+
+        let separator = null;
+        if (rawVar.includes('—')) {
+            separator = '—';
+        } else if (rawVar.includes(':')) {
+            separator = ':';
+        }
+
+        if (separator) {
+            const parts = rawVar.split(separator);
+            varName = parts[0].trim();
+            varHint = parts[1].trim();
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
@@ -284,10 +293,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             category.prompts.forEach(prompt => {
                 if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
                 if (prompt.content) prompt.contentLower = prompt.content.toLowerCase();
+                promptsMap.set(String(prompt.id), { prompt, categoryName: category.name });
             });
         });
 
         promptsData = data.categories;
+
+        // Build lookup map for O(1) access
+        promptsLookup.clear();
+        promptsData.forEach(category => {
+            category.prompts.forEach(prompt => {
+                promptsLookup.set(`${category.name}:${prompt.id}`, prompt);
+            });
+        });
+
         renderSidebar(promptsData);
     } catch (error) {
         console.error('Error loading prompts:', error);
@@ -315,19 +334,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const promptId = btn.dataset.promptId;
             const categoryName = btn.dataset.categoryName;
 
-            // Find prompt in promptsData
-            for (let i = 0; i < promptsData.length; i++) {
-                const category = promptsData[i];
-                if (category.name === categoryName) {
-                    const prompts = category.prompts;
-                    for (let j = 0; j < prompts.length; j++) {
-                        const prompt = prompts[j];
-                        if (String(prompt.id) === String(promptId)) {
-                            selectPrompt(prompt, categoryName);
-                            return;
-                        }
-                    }
-                }
+            // Find prompt in promptsLookup for O(1) access
+            const prompt = promptsLookup.get(`${categoryName}:${promptId}`);
+            if (prompt) {
+                selectPrompt(prompt, categoryName);
             }
         });
     }
@@ -360,7 +370,15 @@ if (typeof module !== 'undefined' && module.exports) {
         selectPrompt,
         renderForm,
         updateOutput,
-        setPromptsData: (data) => promptsData = data,
+        setPromptsData: (data) => {
+            promptsData = data;
+            promptsLookup.clear();
+            promptsData.forEach(category => {
+                category.prompts.forEach(prompt => {
+                    promptsLookup.set(`${category.name}:${prompt.id}`, prompt);
+                });
+            });
+        },
         setCurrentPrompt: (prompt) => currentPrompt = prompt,
         getCurrentPrompt: () => currentPrompt,
         setSearchInput: (el) => searchInput = el,
