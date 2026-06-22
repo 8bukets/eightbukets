@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch, mock_open
 from generate_json import parse_prompts
 
 class TestGenerateJson(unittest.TestCase):
@@ -118,8 +119,29 @@ This is some content. How to Get Maximum Value From This Collection More content
 
     def test_parse_prompts_file_not_found(self):
         # Test that a non-existent but safe path raises FileNotFoundError
-        with self.assertRaises(FileNotFoundError):
-            parse_prompts(filename='non_existent_file_12345.txt')
+        filename = 'non_existent_file_12345.txt'
+        with self.assertRaises(FileNotFoundError) as cm:
+            parse_prompts(filename=filename)
+        self.assertIn("File not found:", str(cm.exception))
+        self.assertIn(filename, str(cm.exception))
+
+    def test_parse_prompts_with_directory_path(self):
+        # Test that passing a directory path raises FileNotFoundError
+        # '.' is always a directory and is safe within base_dir
+        with self.assertRaises(FileNotFoundError) as cm:
+            parse_prompts(filename='.')
+        self.assertIn("File not found:", str(cm.exception))
+
+    def test_parse_prompts_read_from_file(self):
+        # Test reading from a file using mocks to cover lines 19-20
+        mock_content = "Part 1: Mock Category (Prompts 1–1)\n\nPrompt 1 — Mock Title\nMock Content"
+        with patch("pathlib.Path.is_file", return_value=True):
+            with patch("builtins.open", mock_open(read_data=mock_content)):
+                result = parse_prompts(filename="mock_prompts.txt")
+
+        self.assertEqual(len(result["categories"]), 1)
+        self.assertEqual(result["categories"][0]["name"], "Mock Category")
+        self.assertEqual(result["categories"][0]["prompts"][0]["title"], "Mock Title")
 
 if __name__ == '__main__':
     unittest.main()
