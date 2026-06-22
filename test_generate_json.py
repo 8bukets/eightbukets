@@ -110,5 +110,15 @@ This is some content. How to Get Maximum Value From This Collection More content
         result = parse_prompts(mock_data)
         self.assertEqual(result, expected)
 
+    def test_parse_prompts_path_traversal_relative(self):
+        with self.assertRaises(PermissionError) as cm:
+            parse_prompts(filename="../outside.txt")
+        self.assertIn("Access denied: Path traversal detected", str(cm.exception))
+
+    def test_parse_prompts_path_traversal_absolute(self):
+        with self.assertRaises(PermissionError) as cm:
+            parse_prompts(filename="/etc/passwd")
+        self.assertIn("Access denied: Path traversal detected", str(cm.exception))
+
 if __name__ == '__main__':
     unittest.main()
