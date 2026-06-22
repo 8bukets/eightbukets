@@ -8,7 +8,6 @@ let variables = [];
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
-    sidebarContent.textContent = '';
 
     const fragment = document.createDocumentFragment();
     const filterTextLower = filterText.toLowerCase();
@@ -200,8 +199,6 @@ function updateOutput() {
         });
         promptOutput.value = result;
     } else {
-        promptOutput.textContent = '';
-
         let matches = [];
         variables.forEach(variable => {
             let match;
@@ -217,35 +214,34 @@ function updateOutput() {
 
         matches.sort((a, b) => a.start - b.start);
 
+        let htmlResult = '';
         let lastIndex = 0;
         matches.forEach(match => {
             if (match.start < lastIndex) return;
 
             if (match.start > lastIndex) {
-                promptOutput.appendChild(document.createTextNode(content.substring(lastIndex, match.start)));
+                htmlResult += escapeHTML(content.substring(lastIndex, match.start));
             }
 
-            const span = document.createElement('span');
             const variable = match.variable;
             const input = variable.inputElement;
             const isFilled = input && input.value.trim() !== '';
 
             if (isFilled) {
-                span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
-                span.textContent = input.value;
+                htmlResult += `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapeHTML(input.value)}</span>`;
             } else {
-                span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
-                span.textContent = `[${variable.raw}]`;
+                htmlResult += `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${escapeHTML(variable.raw)}]</span>`;
             }
 
-            promptOutput.appendChild(span);
             lastIndex = match.end;
         });
 
         // Add remaining text
         if (lastIndex < content.length) {
-            promptOutput.appendChild(document.createTextNode(content.substring(lastIndex)));
+            htmlResult += escapeHTML(content.substring(lastIndex));
         }
+
+        promptOutput.innerHTML = htmlResult;
     }
 }
 
@@ -289,7 +285,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
         console.error('Error loading prompts:', error);
         if (sidebarContent) {
-            sidebarContent.innerHTML = '';
+            sidebarContent.textContent = '';
             const errorMsg = document.createElement('p');
             errorMsg.className = 'text-red-500';
             errorMsg.textContent = 'Failed to load prompts.';
