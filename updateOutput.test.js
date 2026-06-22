@@ -166,4 +166,30 @@ describe('updateOutput function', () => {
         expect(promptOutput.innerHTML).toContain('&lt;img src="x" onerror="alert(1)"&gt;');
         expect(promptOutput.innerHTML).not.toContain('<img');
     });
+
+    test('should correctly handle overlapping variable names (regex alternation bug)', () => {
+        const promptOutput = document.createElement('div');
+        app.setPromptOutput(promptOutput);
+
+        app.setCurrentPrompt({
+            id: 'test-6',
+            title: 'Test Overlapping',
+            content: 'Replace [VAR] and [VAR_EXTEND].'
+        });
+
+        const dynamicForm = document.getElementById('dynamic-form');
+        app.setDynamicForm(dynamicForm);
+
+        app.selectPrompt(app.getCurrentPrompt(), 'Category');
+
+        const inputVar = document.getElementById('input-VAR');
+        const inputVarExtend = document.getElementById('input-VAR_EXTEND');
+
+        if (inputVar) inputVar.value = 'Short';
+        if (inputVarExtend) inputVarExtend.value = 'Longer';
+
+        app.updateOutput();
+
+        expect(promptOutput.innerHTML).toContain('Replace <span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">Short</span> and <span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">Longer</span>.');
+    });
 });

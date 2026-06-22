@@ -3,6 +3,8 @@ let sidebarContent, searchInput, welcomeMessage, promptWorkspace, promptCategory
 let promptsData = [];
 let currentPrompt = null;
 let variables = [];
+let combinedVariableRegex = null;
+let variableMap = new Map();
 
 // Pre-compute maps and regexes for performance
 const HTML_ESCAPE_MAP = {
@@ -94,12 +96,16 @@ const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 function parseVariables(content) {
     if (!content) {
         variables = [];
+        combinedVariableRegex = null;
+        variableMap.clear();
         return [];
     }
     const regex = /\[(.*?)\]/g;
     const localVariables = [];
     const seenVars = new Set();
     let match;
+
+    const regexParts = [];
 
     while ((match = regex.exec(content)) !== null) {
         const rawVar = match[1];
@@ -119,14 +125,21 @@ function parseVariables(content) {
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-        localVariables.push({
+        const replaceRegexSource = `\\[${escapedVariable}\\]`;
+        const variable = {
             raw: rawVar,
             name: varName,
             hint: varHint,
-            replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
-        });
+            replaceRegex: new RegExp(replaceRegexSource, 'g')
+        };
+        localVariables.push(variable);
+        regexParts.push(replaceRegexSource);
+        variableMap.set(`[${rawVar}]`, variable);
     }
     variables = localVariables;
+    // Sort regex parts by length descending to ensure longer matches take precedence in alternation
+    regexParts.sort((a, b) => b.length - a.length);
+    combinedVariableRegex = regexParts.length > 0 ? new RegExp(regexParts.join('|'), 'g') : null;
     return localVariables;
 }
 
@@ -205,55 +218,58 @@ function updateOutput() {
     const content = currentPrompt.content || '';
     const isTextarea = promptOutput.tagName.toLowerCase() === 'textarea';
 
+    if (!combinedVariableRegex) {
+        if (isTextarea) {
+            promptOutput.value = content;
+        } else {
+            promptOutput.textContent = content;
+        }
+        return;
+    }
+
     if (isTextarea) {
-        let result = content;
-        variables.forEach(v => {
-            const val = (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
-            result = result.replace(v.replaceRegex, () => val);
+        combinedVariableRegex.lastIndex = 0;
+        promptOutput.value = content.replace(combinedVariableRegex, (matched) => {
+            const v = variableMap.get(matched);
+            return (v && v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : matched;
         });
-        promptOutput.value = result;
     } else {
         promptOutput.textContent = '';
-
-        let matches = [];
-        variables.forEach(variable => {
-            let match;
-            const regex = new RegExp(variable.replaceRegex.source, 'g');
-            while ((match = regex.exec(content)) !== null) {
-                matches.push({
-                    start: match.index,
-                    end: match.index + match[0].length,
-                    variable: variable
-                });
-            }
-        });
-
-        matches.sort((a, b) => a.start - b.start);
+        combinedVariableRegex.lastIndex = 0;
 
         let lastIndex = 0;
-        matches.forEach(match => {
-            if (match.start < lastIndex) return;
+        let match;
 
-            if (match.start > lastIndex) {
-                promptOutput.appendChild(document.createTextNode(content.substring(lastIndex, match.start)));
+        while ((match = combinedVariableRegex.exec(content)) !== null) {
+            const start = match.index;
+            const matchedText = match[0];
+            const end = start + matchedText.length;
+
+            if (start > lastIndex) {
+                promptOutput.appendChild(document.createTextNode(content.substring(lastIndex, start)));
             }
 
+            const variable = variableMap.get(matchedText);
             const span = document.createElement('span');
-            const variable = match.variable;
-            const input = variable.inputElement;
-            const isFilled = input && input.value.trim() !== '';
 
-            if (isFilled) {
-                span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
-                span.textContent = input.value;
+            if (variable) {
+                const input = variable.inputElement;
+                const isFilled = input && input.value.trim() !== '';
+
+                if (isFilled) {
+                    span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
+                    span.textContent = input.value;
+                } else {
+                    span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
+                    span.textContent = matchedText;
+                }
             } else {
-                span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
-                span.textContent = `[${variable.raw}]`;
+                span.textContent = matchedText;
             }
 
             promptOutput.appendChild(span);
-            lastIndex = match.end;
-        });
+            lastIndex = end;
+        }
 
         // Add remaining text
         if (lastIndex < content.length) {
