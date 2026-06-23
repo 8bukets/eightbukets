@@ -111,7 +111,6 @@ describe('Prompts Library Error Handling', () => {
     });
 });
 
-
 describe('renderSidebar', () => {
     let app;
     let sidebarContent;
