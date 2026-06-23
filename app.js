@@ -4,6 +4,9 @@ let promptsData = [];
 let promptsMap = new Map();
 let currentPrompt = null;
 let variables = [];
+let combinedVariableRegex = null;
+let variablesMap = new Map();
+let promptsMap = new Map();
 
 function escapeHTML(str) {
     if (!str) return str;
@@ -26,6 +29,7 @@ function renderSidebar(categories, filterText = '') {
     // Clear efficiently
     sidebarContent.textContent = '';
 
+    sidebarContent.textContent = '';
     const fragment = document.createDocumentFragment();
     const filterTextLower = filterText.toLowerCase();
 
@@ -103,6 +107,18 @@ function escapeHTML(str) {
     return str.replace(HTML_ESCAPE_REGEX, (char) => HTML_ESCAPE_MAP[char]);
 }
 
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+};
+
+function escapeHTML(str) {
+    return str.replace(/[&<>"']/g, m => HTML_ESCAPE_MAP[m]);
+}
+
 function parseVariables(content) {
     if (!content) {
         variables = [];
@@ -146,6 +162,22 @@ function parseVariables(content) {
         });
     }
     variables = localVariables;
+
+    if (variables.length > 0) {
+        variablesMap.clear();
+        const patterns = variables.map(v => {
+            variablesMap.set(v.raw, v);
+            const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
+            return `\\[${escaped}\\]`;
+        });
+        // Sort by length descending to match longest possible variable first if they overlap
+        patterns.sort((a, b) => b.length - a.length);
+        combinedVariableRegex = new RegExp(patterns.join('|'), 'g');
+    } else {
+        combinedVariableRegex = null;
+        variablesMap.clear();
+    }
+
     return localVariables;
 }
 
@@ -268,7 +300,6 @@ function updateOutput() {
             lastIndex = end;
         }
 
-        // Add remaining text
         if (lastIndex < content.length) {
             fragment.appendChild(document.createTextNode(content.substring(lastIndex)));
         }
