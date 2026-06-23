@@ -198,6 +198,22 @@ function parseVariables(content) {
     return localVariables;
 }
 
+function rebuildPromptsMap() {
+    promptsMap.clear();
+    if (!promptsData) return;
+    for (let i = 0; i < promptsData.length; i++) {
+        const category = promptsData[i];
+        if (!category || !category.prompts) continue;
+        const prompts = category.prompts;
+        for (let j = 0; j < prompts.length; j++) {
+            const prompt = prompts[j];
+            if (prompt) {
+                promptsMap.set(`${category.name}|${prompt.id}`, prompt);
+            }
+        }
+    }
+}
+
 // Select a prompt
 function selectPrompt(prompt, categoryName) {
     if (!prompt) return;
