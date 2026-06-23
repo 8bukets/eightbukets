@@ -25,7 +25,7 @@ def parse_prompts(data=None, filename='prompts.txt'):
     parts = re.split(r'Part \d+: (.*) \(Prompts \d+–\d+\)', data)
     # The first element is empty string before Part 1
 
-    prompt_regex = re.compile(r'Prompt (\d+) — (.*)')
+    prompt_regex = re.compile(r'^\s*Prompt (\d+) — (.*)', flags=re.MULTILINE)
 
     for i in range(1, len(parts), 2):
         category_name = parts[i].strip()

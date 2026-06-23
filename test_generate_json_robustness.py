@@ -23,16 +23,12 @@ Prompt 1 — Real Title
 This content contains Prompt 2 — Fake Title inside it.
 """
         result = parse_prompts(mock_data)
-        # It currently WILL split on "Prompt 2 — Fake Title" because re.split is used on the whole content
-        # and the regex matches it.
-        # Note: (.*) is greedy, so if there are other prompts it might capture more than expected if not careful,
-        # but re.split splits ON the match, so it's the text BETWEEN matches that becomes content.
+        # It should NOT split on "Prompt 2 — Fake Title" because the regex is anchored to the start of the line.
+        # The fake prompt should just become part of the content of Prompt 1.
         prompts = result["categories"][0]["prompts"]
-        self.assertEqual(len(prompts), 2)
+        self.assertEqual(len(prompts), 1)
         self.assertEqual(prompts[0]["title"], "Real Title")
-        # Due to (.*) being greedy in the regex `Prompt (\d+) — (.*)`,
-        # the title of the second "prompt" will be "Fake Title inside it."
-        self.assertEqual(prompts[1]["title"], "Fake Title inside it.")
+        self.assertEqual(prompts[0]["content"], "This content contains Prompt 2 — Fake Title inside it.")
 
     def test_parse_prompts_no_content_after_last_prompt(self):
         mock_data = """
