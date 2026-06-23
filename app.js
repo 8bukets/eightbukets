@@ -133,6 +133,8 @@ function escapeHTML(str) {
 function parseVariables(content) {
     if (!content) {
         variables = [];
+        combinedVariableRegex = null;
+        variableMap.clear();
         return [];
     }
     const localVariables = [];
@@ -165,12 +167,16 @@ function parseVariables(content) {
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-        localVariables.push({
+        const replaceRegexSource = `\\[${escapedVariable}\\]`;
+        const variable = {
             raw: rawVar,
             name: varName,
             hint: varHint,
-            replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
-        });
+            replaceRegex: new RegExp(replaceRegexSource, 'g')
+        };
+        localVariables.push(variable);
+        regexParts.push(replaceRegexSource);
+        variableMap.set(`[${rawVar}]`, variable);
     }
     variables = localVariables;
 
@@ -303,8 +309,7 @@ function updateOutput() {
                 span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
                 span.textContent = input.value;
             } else {
-                span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
-                span.textContent = `[${variable.raw}]`;
+                span.textContent = matchedText;
             }
             fragment.appendChild(span);
 
