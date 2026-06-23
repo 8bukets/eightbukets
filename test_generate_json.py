@@ -59,7 +59,7 @@ Content 5 with a fake Prompt 6 — Header in it.
         # Prompt 2 will be MISSED because it uses a hyphen.
         # Prompt 3 should be FOUND because regex is not anchored.
         # Prompt 4 should have "Multiple — em-dashes" as title because (.*) is greedy.
-        # Prompt 6 will be FOUND as a separate prompt if it matches exactly.
+        # Prompt 6 will be MISSED because it is inline, so it becomes part of the content.
 
         expected = {
             "categories": [
@@ -85,12 +85,7 @@ Content 5 with a fake Prompt 6 — Header in it.
                         {
                             "id": 5,
                             "title": "Nested Header",
-                            "content": "Content 5 with a fake"
-                        },
-                        {
-                            "id": 6,
-                            "title": "Header in it.",
-                            "content": ""
+                            "content": "Content 5 with a fake Prompt 6 — Header in it."
                         }
                     ]
                 }
