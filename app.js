@@ -18,6 +18,17 @@ function escapeHTML(str) {
         .replace(/"/g, '&quot;');
 }
 
+// Helper to escape HTML and prevent XSS
+function escapeHTML(str) {
+    if (!str) return str;
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&#39;')
+        .replace(/"/g, '&quot;');
+}
+
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
@@ -140,7 +151,7 @@ function parseVariables(content) {
         let varName = rawVar;
         let varHint = "";
 
-        let separator = null;
+        let separator;
         if (rawVar.includes('—')) {
             separator = '—';
         } else if (rawVar.includes(':')) {
@@ -393,6 +404,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+        escapeHTML,
         renderSidebar,
         parseVariables,
         selectPrompt,
