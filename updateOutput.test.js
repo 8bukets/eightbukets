@@ -117,7 +117,7 @@ describe('updateOutput function', () => {
         expect(promptOutput.value).toBe('Hello Alice, welcome to Wonderland.');
     });
 
-    test('should escape HTML to prevent XSS in prompt content', () => {
+    test('should be safe from XSS in prompt content', () => {
         const promptOutput = document.createElement('div');
         app.setPromptOutput(promptOutput);
 
@@ -137,12 +137,12 @@ describe('updateOutput function', () => {
 
         app.updateOutput();
 
-        // The content should have escaped brackets
-        expect(promptOutput.innerHTML).toContain('&lt;script&gt;alert("xss")&lt;/script&gt;');
+        // The content should be rendered as text, not HTML
+        expect(promptOutput.textContent).toContain('<script>alert("xss")</script>');
         expect(promptOutput.innerHTML).not.toContain('<script>');
     });
 
-    test('should escape HTML to prevent XSS in input values', () => {
+    test('should be safe from XSS in input values', () => {
         const promptOutput = document.createElement('div');
         app.setPromptOutput(promptOutput);
 
@@ -158,12 +158,39 @@ describe('updateOutput function', () => {
         app.selectPrompt(app.getCurrentPrompt(), 'Category');
 
         const inputVar = document.getElementById('input-VAR');
-        if (inputVar) inputVar.value = '<img src="x" onerror="alert(1)">';
+        const maliciousString = '<img src="x" onerror="alert(1)">';
+        if (inputVar) inputVar.value = maliciousString;
 
         app.updateOutput();
 
-        // The input value should be escaped in the output
-        expect(promptOutput.innerHTML).toContain('&lt;img src="x" onerror="alert(1)"&gt;');
+        // The input value should be rendered as text in the span
+        expect(promptOutput.textContent).toContain(maliciousString);
         expect(promptOutput.innerHTML).not.toContain('<img');
+    });
+
+    test('should correctly handle overlapping variable names (regex alternation bug)', () => {
+        const promptOutput = document.createElement('div');
+        app.setPromptOutput(promptOutput);
+
+        app.setCurrentPrompt({
+            id: 'test-6',
+            title: 'Test Overlapping',
+            content: 'Replace [VAR] and [VAR_EXTEND].'
+        });
+
+        const dynamicForm = document.getElementById('dynamic-form');
+        app.setDynamicForm(dynamicForm);
+
+        app.selectPrompt(app.getCurrentPrompt(), 'Category');
+
+        const inputVar = document.getElementById('input-VAR');
+        const inputVarExtend = document.getElementById('input-VAR_EXTEND');
+
+        if (inputVar) inputVar.value = 'Short';
+        if (inputVarExtend) inputVarExtend.value = 'Longer';
+
+        app.updateOutput();
+
+        expect(promptOutput.innerHTML).toContain('Replace <span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">Short</span> and <span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">Longer</span>.');
     });
 });
