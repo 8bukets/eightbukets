@@ -1,28 +1,32 @@
 let sidebarContent, searchInput, welcomeMessage, promptWorkspace, promptCategory, promptTitle, dynamicForm, promptOutput, copyBtn, copyToast, noVariablesMsg;
 
 let promptsData = [];
+let promptsMap = new Map();
 let currentPrompt = null;
 let variables = [];
 let combinedVariableRegex = null;
-let variableMap = new Map();
+let variablesMap = new Map();
+let promptsMap = new Map();
 
-// Pre-compute maps and regexes for performance
-const HTML_ESCAPE_MAP = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    "'": '&#39;',
-    '"': '&quot;'
-};
-const HTML_ESCAPE_CHECK_REGEX = /[&<>'"]/;
-const HTML_ESCAPE_REGEX = /[&<>'"]/g;
-
+function escapeHTML(str) {
+    if (!str) return str;
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&#39;')
+        .replace(/"/g, '&quot;');
+}
 
 // Helper to escape HTML and prevent XSS
 function escapeHTML(str) {
     if (!str) return str;
-    if (!HTML_ESCAPE_CHECK_REGEX.test(str)) return str;
-    return str.replace(HTML_ESCAPE_REGEX, (char) => HTML_ESCAPE_MAP[char]);
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&#39;')
+        .replace(/"/g, '&quot;');
 }
 
 // Render Sidebar
@@ -30,9 +34,13 @@ function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
     sidebarContent.textContent = '';
 
+    // Clear sidebar content before rendering
+    sidebarContent.textContent = '';
+
     // Clear efficiently
     sidebarContent.textContent = '';
 
+    sidebarContent.textContent = '';
     const fragment = document.createDocumentFragment();
     const filterTextLower = filterText.toLowerCase();
 
@@ -87,11 +95,40 @@ function renderSidebar(categories, filterText = '') {
         fragment.appendChild(categoryDiv);
     }
 
+    sidebarContent.textContent = '';
     sidebarContent.appendChild(fragment);
 }
 
 // Pre-compile RegExp to avoid recreation inside loops
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
+
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+};
+const HTML_ESCAPE_REGEX = /[&<>"']/g;
+const HTML_ESCAPE_CHECK_REGEX = /[&<>"']/;
+
+function escapeHTML(str) {
+    if (!str) return str;
+    if (!HTML_ESCAPE_CHECK_REGEX.test(str)) return str;
+    return str.replace(HTML_ESCAPE_REGEX, (char) => HTML_ESCAPE_MAP[char]);
+}
+
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+};
+
+function escapeHTML(str) {
+    return str.replace(/[&<>"']/g, m => HTML_ESCAPE_MAP[m]);
+}
 
 function parseVariables(content) {
     if (!content) {
@@ -100,14 +137,12 @@ function parseVariables(content) {
         variableMap.clear();
         return [];
     }
-    const regex = /\[(.*?)\]/g;
     const localVariables = [];
     const seenVars = new Set();
     let match;
 
-    const regexParts = [];
-
-    while ((match = regex.exec(content)) !== null) {
+    VAR_REGEX.lastIndex = 0;
+    while ((match = VAR_REGEX.exec(content)) !== null) {
         const rawVar = match[1];
 
         if (seenVars.has(rawVar)) {
@@ -117,11 +152,18 @@ function parseVariables(content) {
 
         let varName = rawVar;
         let varHint = "";
-        const separator = ['—', ':'].find(s => rawVar.includes(s));
+
+        let separator;
+        if (rawVar.includes('—')) {
+            separator = '—';
+        } else if (rawVar.includes(':')) {
+            separator = ':';
+        }
+
         if (separator) {
-            const parts = rawVar.split(separator);
-            varName = parts[0].trim();
-            varHint = parts[1].trim();
+            const index = rawVar.indexOf(separator);
+            varName = rawVar.substring(0, index).trim();
+            varHint = rawVar.substring(index + 1).trim();
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
@@ -137,9 +179,22 @@ function parseVariables(content) {
         variableMap.set(`[${rawVar}]`, variable);
     }
     variables = localVariables;
-    // Sort regex parts by length descending to ensure longer matches take precedence in alternation
-    regexParts.sort((a, b) => b.length - a.length);
-    combinedVariableRegex = regexParts.length > 0 ? new RegExp(regexParts.join('|'), 'g') : null;
+
+    if (variables.length > 0) {
+        variablesMap.clear();
+        const patterns = variables.map(v => {
+            variablesMap.set(v.raw, v);
+            const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
+            return `\\[${escaped}\\]`;
+        });
+        // Sort by length descending to match longest possible variable first if they overlap
+        patterns.sort((a, b) => b.length - a.length);
+        combinedVariableRegex = new RegExp(patterns.join('|'), 'g');
+    } else {
+        combinedVariableRegex = null;
+        variablesMap.clear();
+    }
+
     return localVariables;
 }
 
@@ -218,63 +273,54 @@ function updateOutput() {
     const content = currentPrompt.content || '';
     const isTextarea = promptOutput.tagName.toLowerCase() === 'textarea';
 
-    if (!combinedVariableRegex) {
-        if (isTextarea) {
-            promptOutput.value = content;
-        } else {
-            promptOutput.textContent = content;
-        }
-        return;
-    }
+    // Optimization: Create a map for quick variable lookup
+    const varMap = new Map();
+    variables.forEach(v => {
+        varMap.set(v.raw, v);
+    });
 
     if (isTextarea) {
-        combinedVariableRegex.lastIndex = 0;
-        promptOutput.value = content.replace(combinedVariableRegex, (matched) => {
-            const v = variableMap.get(matched);
-            return (v && v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : matched;
+        // Single pass replacement
+        promptOutput.value = content.replace(VAR_REGEX, (match, raw) => {
+            const v = varMap.get(raw);
+            if (v) {
+                return (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
+            }
+            return match;
         });
-    } else {
+
+        matches.sort((a, b) => a.start - b.start);
+
+        // Clear efficiently
         promptOutput.textContent = '';
-        combinedVariableRegex.lastIndex = 0;
+        const fragment = document.createDocumentFragment();
 
         let lastIndex = 0;
-        let match;
 
-        while ((match = combinedVariableRegex.exec(content)) !== null) {
-            const start = match.index;
-            const matchedText = match[0];
-            const end = start + matchedText.length;
-
-            if (start > lastIndex) {
-                promptOutput.appendChild(document.createTextNode(content.substring(lastIndex, start)));
+            if (match.start > lastIndex) {
+                fragment.appendChild(document.createTextNode(content.substring(lastIndex, match.start)));
             }
 
-            const variable = variableMap.get(matchedText);
+            const input = variable.inputElement;
+            const isFilled = input && input.value.trim() !== '';
+
             const span = document.createElement('span');
-
-            if (variable) {
-                const input = variable.inputElement;
-                const isFilled = input && input.value.trim() !== '';
-
-                if (isFilled) {
-                    span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
-                    span.textContent = input.value;
-                } else {
-                    span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
-                    span.textContent = matchedText;
-                }
+            if (isFilled) {
+                span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
+                span.textContent = input.value;
             } else {
                 span.textContent = matchedText;
             }
+            fragment.appendChild(span);
 
-            promptOutput.appendChild(span);
             lastIndex = end;
         }
 
-        // Add remaining text
         if (lastIndex < content.length) {
-            promptOutput.appendChild(document.createTextNode(content.substring(lastIndex)));
+            fragment.appendChild(document.createTextNode(content.substring(lastIndex)));
         }
+
+        promptOutput.appendChild(fragment);
     }
 }
 
@@ -296,6 +342,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const response = await fetch('prompts.json');
         const data = await response.json();
 
+        // Build lookup map for O(1) access
+        promptsLookup.clear();
         data.categories.forEach(category => {
             category.prompts.forEach(prompt => {
                 if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
@@ -304,11 +352,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         promptsData = data.categories;
+
         renderSidebar(promptsData);
     } catch (error) {
         console.error('Error loading prompts:', error);
         if (sidebarContent) {
-            sidebarContent.innerHTML = '';
+            sidebarContent.textContent = '';
             const errorMsg = document.createElement('p');
             errorMsg.className = 'text-red-500';
             errorMsg.textContent = 'Failed to load prompts.';
@@ -329,21 +378,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!btn) return;
 
             const promptId = btn.dataset.promptId;
-            const categoryName = btn.dataset.categoryName;
 
-            // Find prompt in promptsData
-            for (let i = 0; i < promptsData.length; i++) {
-                const category = promptsData[i];
-                if (category.name === categoryName) {
-                    const prompts = category.prompts;
-                    for (let j = 0; j < prompts.length; j++) {
-                        const prompt = prompts[j];
-                        if (String(prompt.id) === String(promptId)) {
-                            selectPrompt(prompt, categoryName);
-                            return;
-                        }
-                    }
-                }
+            // Find prompt in promptsMap for O(1) access
+            const promptData = promptsMap.get(String(promptId));
+            if (promptData) {
+                selectPrompt(promptData.prompt, promptData.categoryName);
             }
         });
     }
@@ -376,7 +415,17 @@ if (typeof module !== 'undefined' && module.exports) {
         selectPrompt,
         renderForm,
         updateOutput,
-        setPromptsData: (data) => promptsData = data,
+        setPromptsData: (data) => {
+            promptsData = data;
+            promptsMap.clear();
+            promptsData.forEach(category => {
+                category.prompts.forEach(prompt => {
+                    if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
+                    if (prompt.content) prompt.contentLower = prompt.content.toLowerCase();
+                    promptsMap.set(String(prompt.id), { prompt, categoryName: category.name });
+                });
+            });
+        },
         setCurrentPrompt: (prompt) => currentPrompt = prompt,
         getCurrentPrompt: () => currentPrompt,
         setSearchInput: (el) => searchInput = el,
