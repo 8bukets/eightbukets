@@ -202,5 +202,17 @@ This is some content. How to Get Maximum Value From This Collection More content
         self.assertEqual(result["categories"][0]["name"], "Mock Category")
         self.assertEqual(result["categories"][0]["prompts"][0]["title"], "Mock Title")
 
+    @patch("pathlib.Path.is_file")
+    def test_parse_prompts_mocked_file_not_found(self, mock_is_file):
+        # Mock is_file to always return False to deterministically test line 17
+        mock_is_file.return_value = False
+        filename = "some_random_file.txt"
+
+        with self.assertRaises(FileNotFoundError) as cm:
+            parse_prompts(filename=filename)
+
+        self.assertIn("File not found:", str(cm.exception))
+        self.assertIn(filename, str(cm.exception))
+
 if __name__ == '__main__':
     unittest.main()
