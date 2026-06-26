@@ -6,8 +6,6 @@ let currentPrompt = null;
 let variables = [];
 let combinedVariableRegex = null;
 let variablesMap = new Map();
-let promptsMap = new Map();
-
 function escapeHTML(str) {
     if (!str) return str;
     return str
@@ -18,16 +16,6 @@ function escapeHTML(str) {
         .replace(/"/g, '&quot;');
 }
 
-// Helper to escape HTML and prevent XSS
-function escapeHTML(str) {
-    if (!str) return str;
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/'/g, '&#39;')
-        .replace(/"/g, '&quot;');
-}
 
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
@@ -111,40 +99,21 @@ const HTML_ESCAPE_MAP = {
     '"': '&quot;',
     "'": '&#39;'
 };
-const HTML_ESCAPE_REGEX = /[&<>"']/g;
-const HTML_ESCAPE_CHECK_REGEX = /[&<>"']/;
 
-function escapeHTML(str) {
-    if (!str) return str;
-    if (!HTML_ESCAPE_CHECK_REGEX.test(str)) return str;
-    return str.replace(HTML_ESCAPE_REGEX, (char) => HTML_ESCAPE_MAP[char]);
-}
-
-const HTML_ESCAPE_MAP = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-};
-
-function escapeHTML(str) {
-    return str.replace(/[&<>"']/g, m => HTML_ESCAPE_MAP[m]);
-}
 
 function parseVariables(content) {
     if (!content) {
         variables = [];
         combinedVariableRegex = null;
-        variableMap.clear();
+        variablesMap.clear();
         return [];
     }
     const localVariables = [];
     const seenVars = new Set();
     let match;
 
-    VAR_REGEX.lastIndex = 0;
-    while ((match = VAR_REGEX.exec(content)) !== null) {
+    VARIABLE_REGEX.lastIndex = 0;
+    while ((match = VARIABLE_REGEX.exec(content)) !== null) {
         const rawVar = match[1];
 
         if (seenVars.has(rawVar)) {
@@ -177,8 +146,8 @@ function parseVariables(content) {
             replaceRegex: new RegExp(replaceRegexSource, 'g')
         };
         localVariables.push(variable);
-        regexParts.push(replaceRegexSource);
-        variableMap.set(`[${rawVar}]`, variable);
+
+
     }
     variables = localVariables;
 
@@ -299,46 +268,64 @@ function updateOutput() {
 
     if (isTextarea) {
         // Single pass replacement
-        promptOutput.value = content.replace(VAR_REGEX, (match, raw) => {
+        promptOutput.value = content.replace(VARIABLE_REGEX, (match, raw) => {
             const v = varMap.get(raw);
             if (v) {
                 return (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
             }
             return match;
         });
+    } else {
+        const matches = [];
+        let match;
+
+        if (combinedVariableRegex) {
+            combinedVariableRegex.lastIndex = 0;
+            while ((match = combinedVariableRegex.exec(content)) !== null) {
+                const matchedText = match[0];
+                const rawVar = matchedText.slice(1, -1);
+                const variable = variablesMap.get(rawVar);
+                if (variable) {
+                    matches.push({
+                        start: match.index,
+                        end: match.index + matchedText.length,
+                        variable,
+                        matchedText
+                    });
+                }
+            }
+        }
 
         matches.sort((a, b) => a.start - b.start);
 
         // Clear efficiently
-        promptOutput.textContent = '';
-        const fragment = document.createDocumentFragment();
-
+        let htmlOutput = '';
         let lastIndex = 0;
 
-            if (match.start > lastIndex) {
-                fragment.appendChild(document.createTextNode(content.substring(lastIndex, match.start)));
+        for (let i = 0; i < matches.length; i++) {
+            const { start, end, variable, matchedText } = matches[i];
+
+            if (start > lastIndex) {
+                htmlOutput += escapeHTML(content.substring(lastIndex, start));
             }
 
             const input = variable.inputElement;
             const isFilled = input && input.value.trim() !== '';
 
-            const span = document.createElement('span');
             if (isFilled) {
-                span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
-                span.textContent = input.value;
+                htmlOutput += `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapeHTML(input.value)}</span>`;
             } else {
-                span.textContent = matchedText;
+                htmlOutput += `<span class="bg-gray-200 text-gray-600 px-1 rounded">${escapeHTML(matchedText)}</span>`;
             }
-            fragment.appendChild(span);
 
             lastIndex = end;
         }
 
         if (lastIndex < content.length) {
-            fragment.appendChild(document.createTextNode(content.substring(lastIndex)));
+            htmlOutput += escapeHTML(content.substring(lastIndex));
         }
 
-        promptOutput.appendChild(fragment);
+        promptOutput.innerHTML = htmlOutput;
     }
 }
 
