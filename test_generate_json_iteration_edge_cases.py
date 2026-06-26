@@ -96,5 +96,30 @@ Content"""
         self.assertEqual(prompts[0]["id"], 1)
         self.assertEqual(prompts[0]["title"], "Instant Title")
 
+    def test_prompt_block_iteration_unexpected_formatting(self):
+        """Tests that unexpected formatting tests how robust the regex split and indexing are."""
+        mock_data = """
+Part 1: Unexpected Format Category (Prompts 1–2)
+
+Prompt 01 — Title with leading zero
+Content for 1
+Prompt 999999 —
+Content for empty title
+"""
+        result = parse_prompts(mock_data)
+        prompts = result["categories"][0]["prompts"]
+
+        self.assertEqual(len(prompts), 2)
+
+        # Test leading zero ID parses to integer correctly
+        self.assertEqual(prompts[0]["id"], 1)
+        self.assertEqual(prompts[0]["title"], "Title with leading zero")
+        self.assertEqual(prompts[0]["content"], "Content for 1")
+
+        # Test large ID and empty title parses correctly
+        self.assertEqual(prompts[1]["id"], 999999)
+        self.assertEqual(prompts[1]["title"], "")
+        self.assertEqual(prompts[1]["content"], "Content for empty title")
+
 if __name__ == '__main__':
     unittest.main()
