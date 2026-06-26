@@ -3,8 +3,8 @@ let sidebarContent, searchInput, welcomeMessage, promptWorkspace, promptCategory
 let promptsData = [];
 let currentPrompt = null;
 let variables = [];
-
-// Helper to escape HTML and prevent XSS
+let combinedVariableRegex = null;
+let variablesMap = new Map();
 function escapeHTML(str) {
     if (!str) return str;
     return str
@@ -14,6 +14,7 @@ function escapeHTML(str) {
         .replace(/'/g, '&#39;')
         .replace(/"/g, '&quot;');
 }
+
 
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
@@ -68,14 +69,31 @@ function renderSidebar(categories, filterText = '') {
 
 // Pre-compile RegExp to avoid recreation inside loops
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
+const VARIABLE_REGEX = /\[(.*?)\]/g;
+const VAR_SEPARATORS = ['—', ':'];
+
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+};
+
 
 function parseVariables(content) {
-    const regex = /\[(.*?)\]/g;
-    variables = [];
+    if (!content) {
+        variables = [];
+        combinedVariableRegex = null;
+        variablesMap.clear();
+        return [];
+    }
+    const localVariables = [];
     const seenVars = new Set();
     let match;
 
-    while ((match = regex.exec(content)) !== null) {
+    VARIABLE_REGEX.lastIndex = 0;
+    while ((match = VARIABLE_REGEX.exec(content)) !== null) {
         const rawVar = match[1];
 
         // Avoid duplicates
@@ -101,7 +119,20 @@ function parseVariables(content) {
             raw: rawVar,
             name: varName,
             hint: varHint,
-            replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
+            replaceRegex: new RegExp(replaceRegexSource, 'g')
+        };
+        localVariables.push(variable);
+
+
+    }
+    variables = localVariables;
+
+    if (variables.length > 0) {
+        variablesMap.clear();
+        const patterns = variables.map(v => {
+            variablesMap.set(v.raw, v);
+            const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
+            return `\\[${escaped}\\]`;
         });
     }
     return variables;
@@ -177,40 +208,73 @@ function updateOutput() {
 
     let finalContent = currentPrompt.content;
 
-    // Escape HTML to prevent XSS before doing custom highlighting
-    finalContent = escapeHTML(finalContent);
+    // Optimization: Create a map for quick variable lookup
+    const varMap = new Map();
+    variables.forEach(v => {
+        varMap.set(v.raw, v);
+    });
+
+    if (isTextarea) {
+        // Single pass replacement
+        promptOutput.value = content.replace(VARIABLE_REGEX, (match, raw) => {
+            const v = varMap.get(raw);
+            if (v) {
+                return (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
+            }
+            return match;
+        });
+    } else {
+        const matches = [];
+        let match;
+
+        if (combinedVariableRegex) {
+            combinedVariableRegex.lastIndex = 0;
+            while ((match = combinedVariableRegex.exec(content)) !== null) {
+                const matchedText = match[0];
+                const rawVar = matchedText.slice(1, -1);
+                const variable = variablesMap.get(rawVar);
+                if (variable) {
+                    matches.push({
+                        start: match.index,
+                        end: match.index + matchedText.length,
+                        variable,
+                        matchedText
+                    });
+                }
+            }
+        }
+
+        matches.sort((a, b) => a.start - b.start);
+
+        // Clear efficiently
+        let htmlOutput = '';
+        let lastIndex = 0;
+
+        for (let i = 0; i < matches.length; i++) {
+            const { start, end, variable, matchedText } = matches[i];
+
+            if (start > lastIndex) {
+                htmlOutput += escapeHTML(content.substring(lastIndex, start));
+            }
 
     if (promptOutput) {
         variables.forEach(variable => {
             const input = variable.inputElement;
 
-            const replaceRegex = variable.replaceRegex;
-
-            if (input && input.value.trim() !== '') {
-                // Escape input to prevent XSS
-                let escapedVal = escapeHTML(input.value);
-                const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
-                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
+            if (isFilled) {
+                htmlOutput += `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapeHTML(input.value)}</span>`;
             } else {
-                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
-                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
+                htmlOutput += `<span class="bg-gray-200 text-gray-600 px-1 rounded">${escapeHTML(matchedText)}</span>`;
             }
-        });
-        if (promptOutput.tagName === 'TEXTAREA') {
-            // Revert escaped HTML characters in textarea value
-            promptOutput.value = finalContent
-                .replace(/&amp;/g, '&')
-                .replace(/&lt;/g, '<')
-                .replace(/&gt;/g, '>')
-                .replace(/&#39;/g, "'")
-                .replace(/&quot;/g, '"');
-            // Remove the span tags that were added for DIV formatting
-            promptOutput.value = promptOutput.value
-                .replace(/<span class="[^"]*">/g, '')
-                .replace(/<\/span>/g, '');
-        } else {
-            promptOutput.innerHTML = finalContent;
+
+            lastIndex = end;
         }
+
+        if (lastIndex < content.length) {
+            htmlOutput += escapeHTML(content.substring(lastIndex));
+        }
+
+        promptOutput.innerHTML = htmlOutput;
     }
 }
 
