@@ -176,6 +176,14 @@ This is some content. How to Get Maximum Value From This Collection More content
             parse_prompts(filename='../foo.txt')
         self.assertIn("Access denied: Path traversal detected", str(cm.exception))
 
+    @patch("pathlib.Path.relative_to")
+    def test_parse_prompts_path_traversal_mock(self, mock_relative_to):
+        # Mock relative_to to deterministically test ValueError raising PermissionError
+        mock_relative_to.side_effect = ValueError("Mocked ValueError")
+        with self.assertRaises(PermissionError) as cm:
+            parse_prompts(filename='dummy.txt')
+        self.assertIn("Access denied: Path traversal detected for dummy.txt", str(cm.exception))
+
     def test_parse_prompts_file_not_found(self):
         # Test that a non-existent but safe path raises FileNotFoundError
         filename = 'non_existent_file_12345.txt'
