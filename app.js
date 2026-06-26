@@ -1,22 +1,8 @@
 let sidebarContent, searchInput, welcomeMessage, promptWorkspace, promptCategory, promptTitle, dynamicForm, promptOutput, copyBtn, copyToast, noVariablesMsg;
 
 let promptsData = [];
-let promptsMap = new Map();
 let currentPrompt = null;
 let variables = [];
-let combinedVariableRegex = null;
-let variablesMap = new Map();
-let promptsMap = new Map();
-
-function escapeHTML(str) {
-    if (!str) return str;
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/'/g, '&#39;')
-        .replace(/"/g, '&quot;');
-}
 
 // Helper to escape HTML and prevent XSS
 function escapeHTML(str) {
@@ -32,33 +18,18 @@ function escapeHTML(str) {
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
-    sidebarContent.textContent = '';
+    sidebarContent.innerHTML = '';
 
-    // Clear sidebar content before rendering
-    sidebarContent.textContent = '';
-
-    // Clear efficiently
-    sidebarContent.textContent = '';
-
-    sidebarContent.textContent = '';
-    const fragment = document.createDocumentFragment();
     const filterTextLower = filterText.toLowerCase();
 
-    const categoriesLength = categories.length;
-    for (let i = 0; i < categoriesLength; i++) {
-        const category = categories[i];
-        const prompts = category.prompts;
-        const promptsLength = prompts.length;
-        const filteredPrompts = [];
+    categories.forEach(category => {
+        const filteredPrompts = category.prompts.filter(prompt => {
+            // Strictly use pre-computed lowercase fields to avoid repeated string manipulation
+            // and fallback to empty string if missing to avoid throwing and maintain performance
+            return (prompt.titleLower || '').includes(filterTextLower) || (prompt.contentLower || '').includes(filterTextLower);
+        });
 
-        for (let j = 0; j < promptsLength; j++) {
-            const prompt = prompts[j];
-            if ((prompt.titleLower || '').includes(filterTextLower) || (prompt.contentLower || '').includes(filterTextLower)) {
-                filteredPrompts.push(prompt);
-            }
-        }
-
-        if (filteredPrompts.length === 0) continue;
+        if (filteredPrompts.length === 0) return;
 
         const categoryDiv = document.createElement('div');
         categoryDiv.className = 'mb-6';
@@ -71,149 +42,69 @@ function renderSidebar(categories, filterText = '') {
         const promptList = document.createElement('ul');
         promptList.className = 'space-y-1';
 
-        const filteredLength = filteredPrompts.length;
-        for (let j = 0; j < filteredLength; j++) {
-            const prompt = filteredPrompts[j];
+        filteredPrompts.forEach(prompt => {
             const li = document.createElement('li');
             const btn = document.createElement('button');
+            btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate';
 
-            const isSelected = currentPrompt && currentPrompt.id === prompt.id;
-            btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate' +
-                (isSelected ? ' bg-indigo-100 text-indigo-800 font-semibold' : ' text-gray-700 hover:bg-indigo-50 hover:text-indigo-700');
+            // Add highlighting if this is the currently selected prompt
+            if (currentPrompt && currentPrompt.id === prompt.id) {
+                btn.classList.add('bg-indigo-100', 'text-indigo-800', 'font-semibold');
+            } else {
+                btn.classList.add('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+            }
 
             btn.textContent = prompt.title;
-
-            // Store data for event delegation
-            btn.dataset.promptId = prompt.id;
-            btn.dataset.categoryName = category.name;
+            btn.onclick = () => selectPrompt(prompt, category.name);
 
             li.appendChild(btn);
             promptList.appendChild(li);
-        }
+        });
 
         categoryDiv.appendChild(promptList);
-        fragment.appendChild(categoryDiv);
-    }
-
-    sidebarContent.textContent = '';
-    sidebarContent.appendChild(fragment);
+        sidebarContent.appendChild(categoryDiv);
+    });
 }
 
 // Pre-compile RegExp to avoid recreation inside loops
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
-const VARIABLE_REGEX = /\[(.*?)\]/g;
-const VAR_SEPARATORS = ['—', ':'];
-
-const HTML_ESCAPE_MAP = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-};
-const HTML_ESCAPE_REGEX = /[&<>"']/g;
-const HTML_ESCAPE_CHECK_REGEX = /[&<>"']/;
-
-function escapeHTML(str) {
-    if (!str) return str;
-    if (!HTML_ESCAPE_CHECK_REGEX.test(str)) return str;
-    return str.replace(HTML_ESCAPE_REGEX, (char) => HTML_ESCAPE_MAP[char]);
-}
-
-const HTML_ESCAPE_MAP = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-};
-
-function escapeHTML(str) {
-    return str.replace(/[&<>"']/g, m => HTML_ESCAPE_MAP[m]);
-}
 
 function parseVariables(content) {
-    if (!content) {
-        variables = [];
-        combinedVariableRegex = null;
-        variableMap.clear();
-        return [];
-    }
-    const localVariables = [];
+    const regex = /\[(.*?)\]/g;
+    variables = [];
     const seenVars = new Set();
     let match;
 
-    VAR_REGEX.lastIndex = 0;
-    while ((match = VAR_REGEX.exec(content)) !== null) {
+    while ((match = regex.exec(content)) !== null) {
         const rawVar = match[1];
 
+        // Avoid duplicates
         if (seenVars.has(rawVar)) {
             continue;
         }
         seenVars.add(rawVar);
 
+        // Split variable name and hint
         let varName = rawVar;
         let varHint = "";
-
-        let separator;
-        if (rawVar.includes('—')) {
-            separator = '—';
-        } else if (rawVar.includes(':')) {
-            separator = ':';
+        let separatorIndex = rawVar.indexOf('—');
+        if (separatorIndex === -1) {
+            separatorIndex = rawVar.indexOf(':');
         }
-
-        if (separator) {
-            const index = rawVar.indexOf(separator);
-            varName = rawVar.substring(0, index).trim();
-            varHint = rawVar.substring(index + 1).trim();
+        if (separatorIndex !== -1) {
+            varName = rawVar.substring(0, separatorIndex).trim();
+            varHint = rawVar.substring(separatorIndex + 1).trim();
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-        const replaceRegexSource = `\\[${escapedVariable}\\]`;
-        const variable = {
+        variables.push({
             raw: rawVar,
             name: varName,
             hint: varHint,
-            replaceRegex: new RegExp(replaceRegexSource, 'g')
-        };
-        localVariables.push(variable);
-        regexParts.push(replaceRegexSource);
-        variableMap.set(`[${rawVar}]`, variable);
-    }
-    variables = localVariables;
-
-    if (variables.length > 0) {
-        variablesMap.clear();
-        const patterns = variables.map(v => {
-            variablesMap.set(v.raw, v);
-            const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
-            return `\\[${escaped}\\]`;
+            replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
         });
-        // Sort by length descending to match longest possible variable first if they overlap
-        patterns.sort((a, b) => b.length - a.length);
-        combinedVariableRegex = new RegExp(patterns.join('|'), 'g');
-    } else {
-        combinedVariableRegex = null;
-        variablesMap.clear();
     }
-
-    return localVariables;
-}
-
-function rebuildPromptsMap() {
-    promptsMap.clear();
-    if (!promptsData) return;
-    for (let i = 0; i < promptsData.length; i++) {
-        const category = promptsData[i];
-        if (!category || !category.prompts) continue;
-        const prompts = category.prompts;
-        for (let j = 0; j < prompts.length; j++) {
-            const prompt = prompts[j];
-            if (prompt) {
-                promptsMap.set(`${category.name}|${prompt.id}`, prompt);
-            }
-        }
-    }
+    return variables;
 }
 
 // Select a prompt
@@ -221,18 +112,21 @@ function selectPrompt(prompt, categoryName) {
     if (!prompt) return;
     currentPrompt = prompt;
 
+    // Re-render sidebar to update highlighting
     if (searchInput) renderSidebar(promptsData, searchInput.value);
 
+    // Update UI
     if (welcomeMessage) welcomeMessage.classList.add('hidden');
     if (promptWorkspace) {
         promptWorkspace.classList.remove('hidden');
         promptWorkspace.classList.add('flex');
     }
 
-    if (promptCategory) promptCategory.textContent = categoryName || '';
-    if (promptTitle) promptTitle.textContent = prompt.title || '';
+    if (promptCategory) promptCategory.textContent = categoryName;
+    if (promptTitle) promptTitle.textContent = prompt.title;
 
-    parseVariables(prompt.content || '');
+    // Parse variables like [TOPIC], [YOUR NICHE]
+    variables = parseVariables(prompt.content);
 
     renderForm();
     updateOutput();
@@ -241,9 +135,7 @@ function selectPrompt(prompt, categoryName) {
 // Render Form Inputs
 function renderForm() {
     if (!dynamicForm) return;
-
-    // Clear efficiently
-    dynamicForm.textContent = '';
+    dynamicForm.innerHTML = '';
 
     if (variables.length === 0) {
         if (noVariablesMsg) noVariablesMsg.classList.remove('hidden');
@@ -252,8 +144,6 @@ function renderForm() {
         if (noVariablesMsg) noVariablesMsg.classList.add('hidden');
         dynamicForm.classList.remove('hidden');
 
-        const fragment = document.createDocumentFragment();
-
         variables.forEach(variable => {
             const div = document.createElement('div');
             div.className = 'flex flex-col gap-1';
@@ -261,84 +151,66 @@ function renderForm() {
             const label = document.createElement('label');
             label.className = 'text-xs font-semibold text-gray-600 uppercase';
             label.textContent = variable.name;
-
-            const safeId = `input-${variable.raw}`;
-            label.setAttribute('for', safeId);
+            label.setAttribute('for', `input-${variable.raw}`);
 
             const input = document.createElement('textarea');
-            input.id = safeId;
+            input.id = `input-${variable.raw}`;
             input.className = 'w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-y';
             input.rows = 2;
             input.placeholder = variable.hint ? `e.g. ${variable.hint}` : `Enter ${variable.name}...`;
 
+            // Cache the input element directly on the variable object to avoid repeated DOM queries in loops
             variable.inputElement = input;
 
             input.addEventListener('input', updateOutput);
 
             div.appendChild(label);
             div.appendChild(input);
-            fragment.appendChild(div);
+            dynamicForm.appendChild(div);
         });
-
-        dynamicForm.appendChild(fragment);
     }
 }
 
-// Update Output
+// Update Textarea Output
 function updateOutput() {
-    if (!currentPrompt || !promptOutput) return;
+    if (!currentPrompt) return;
 
-    const content = currentPrompt.content || '';
-    const isTextarea = promptOutput.tagName.toLowerCase() === 'textarea';
+    let finalContent = currentPrompt.content;
 
-    // Optimization: Create a map for quick variable lookup
-    const varMap = new Map();
-    variables.forEach(v => {
-        varMap.set(v.raw, v);
-    });
+    // Escape HTML to prevent XSS before doing custom highlighting
+    finalContent = escapeHTML(finalContent);
 
-    if (isTextarea) {
-        // Single pass replacement
-        promptOutput.value = content.replace(VAR_REGEX, (match, raw) => {
-            const v = varMap.get(raw);
-            if (v) {
-                return (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
-            }
-            return match;
-        });
-
-        matches.sort((a, b) => a.start - b.start);
-
-        // Clear efficiently
-        promptOutput.textContent = '';
-        const fragment = document.createDocumentFragment();
-
-        let lastIndex = 0;
-
-            if (match.start > lastIndex) {
-                fragment.appendChild(document.createTextNode(content.substring(lastIndex, match.start)));
-            }
-
+    if (promptOutput) {
+        variables.forEach(variable => {
             const input = variable.inputElement;
-            const isFilled = input && input.value.trim() !== '';
 
-            const span = document.createElement('span');
-            if (isFilled) {
-                span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
-                span.textContent = input.value;
+            const replaceRegex = variable.replaceRegex;
+
+            if (input && input.value.trim() !== '') {
+                // Escape input to prevent XSS
+                let escapedVal = escapeHTML(input.value);
+                const htmlVal = `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapedVal}</span>`;
+                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
             } else {
-                span.textContent = matchedText;
+                const htmlVal = `<span class="bg-gray-200 text-gray-600 px-1 rounded">[${variable.raw}]</span>`;
+                finalContent = finalContent.replace(replaceRegex, () => htmlVal);
             }
-            fragment.appendChild(span);
-
-            lastIndex = end;
+        });
+        if (promptOutput.tagName === 'TEXTAREA') {
+            // Revert escaped HTML characters in textarea value
+            promptOutput.value = finalContent
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&#39;/g, "'")
+                .replace(/&quot;/g, '"');
+            // Remove the span tags that were added for DIV formatting
+            promptOutput.value = promptOutput.value
+                .replace(/<span class="[^"]*">/g, '')
+                .replace(/<\/span>/g, '');
+        } else {
+            promptOutput.innerHTML = finalContent;
         }
-
-        if (lastIndex < content.length) {
-            fragment.appendChild(document.createTextNode(content.substring(lastIndex)));
-        }
-
-        promptOutput.appendChild(fragment);
     }
 }
 
@@ -356,12 +228,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     copyToast = document.getElementById('copy-toast');
     noVariablesMsg = document.getElementById('no-variables-msg');
 
+    // Fetch JSON data
     try {
         const response = await fetch('prompts.json');
         const data = await response.json();
 
-        // Build lookup map for O(1) access
-        promptsLookup.clear();
+        // Pre-compute lowercase strings for faster search filtering
         data.categories.forEach(category => {
             category.prompts.forEach(prompt => {
                 if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
@@ -370,38 +242,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         promptsData = data.categories;
-
         renderSidebar(promptsData);
     } catch (error) {
         console.error('Error loading prompts:', error);
-        if (sidebarContent) {
-            sidebarContent.textContent = '';
-            const errorMsg = document.createElement('p');
-            errorMsg.className = 'text-red-500';
-            errorMsg.textContent = 'Failed to load prompts.';
-            sidebarContent.appendChild(errorMsg);
-        }
+        if (sidebarContent) sidebarContent.innerHTML = '<p class="text-red-500">Failed to load prompts.</p>';
     }
 
+    // Search functionality
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
             renderSidebar(promptsData, e.target.value);
-        });
-    }
-
-    // Event delegation for prompt selection
-    if (sidebarContent) {
-        sidebarContent.addEventListener('click', (e) => {
-            const btn = e.target.closest('.prompt-btn');
-            if (!btn) return;
-
-            const promptId = btn.dataset.promptId;
-
-            // Find prompt in promptsMap for O(1) access
-            const promptData = promptsMap.get(String(promptId));
-            if (promptData) {
-                selectPrompt(promptData.prompt, promptData.categoryName);
-            }
         });
     }
 
@@ -427,22 +277,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+        escapeHTML,
         renderSidebar,
         parseVariables,
         selectPrompt,
+        parseVariables,
         renderForm,
         updateOutput,
-        setPromptsData: (data) => {
-            promptsData = data;
-            promptsMap.clear();
-            promptsData.forEach(category => {
-                category.prompts.forEach(prompt => {
-                    if (prompt.title) prompt.titleLower = prompt.title.toLowerCase();
-                    if (prompt.content) prompt.contentLower = prompt.content.toLowerCase();
-                    promptsMap.set(String(prompt.id), { prompt, categoryName: category.name });
-                });
-            });
-        },
+        setPromptsData: (data) => promptsData = data,
         setCurrentPrompt: (prompt) => currentPrompt = prompt,
         getCurrentPrompt: () => currentPrompt,
         setSearchInput: (el) => searchInput = el,
