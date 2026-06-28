@@ -119,7 +119,7 @@ function parseVariables(content) {
             raw: rawVar,
             name: varName,
             hint: varHint,
-            replaceRegex: new RegExp(replaceRegexSource, 'g')
+            replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
         };
         localVariables.push(variable);
     }
@@ -211,6 +211,7 @@ function updateOutput() {
     const content = currentPrompt.content;
     const isTextarea = promptOutput.tagName === 'TEXTAREA' || promptOutput.nodeName === 'TEXTAREA';
 
+    const isTextarea = promptOutput && promptOutput.tagName === 'TEXTAREA';
     if (isTextarea) {
         // Optimization: Create a map for quick variable lookup
         const varMap = new Map();
@@ -232,7 +233,7 @@ function updateOutput() {
 
         if (combinedVariableRegex) {
             combinedVariableRegex.lastIndex = 0;
-            while ((match = combinedVariableRegex.exec(content)) !== null) {
+            while ((match = combinedVariableRegex.exec(finalContent)) !== null) {
                 const matchedText = match[0];
                 const rawVar = matchedText.slice(1, -1);
                 const variable = variablesMap.get(rawVar);
@@ -256,7 +257,7 @@ function updateOutput() {
             const { start, end, variable, matchedText } = matches[i];
 
             if (start > lastIndex) {
-                htmlOutput += escapeHTML(content.substring(lastIndex, start));
+                htmlOutput += escapeHTML(finalContent.substring(lastIndex, start));
             }
 
             const input = variable.inputElement;
@@ -271,11 +272,13 @@ function updateOutput() {
             lastIndex = end;
         }
 
-        if (lastIndex < content.length) {
-            htmlOutput += escapeHTML(content.substring(lastIndex));
+        if (lastIndex < finalContent.length) {
+            htmlOutput += escapeHTML(finalContent.substring(lastIndex));
         }
 
-        promptOutput.innerHTML = htmlOutput;
+        if (promptOutput) {
+            promptOutput.innerHTML = htmlOutput;
+        }
     }
 }
 
