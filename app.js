@@ -115,11 +115,11 @@ function parseVariables(content) {
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-        variables.push({
+        const variable = {
             raw: rawVar,
             name: varName,
             hint: varHint,
-            replaceRegex: new RegExp(replaceRegexSource, 'g')
+            replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
         };
         localVariables.push(variable);
 
@@ -134,6 +134,7 @@ function parseVariables(content) {
             const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
             return `\\[${escaped}\\]`;
         });
+        combinedVariableRegex = new RegExp(patterns.join('|'), 'g');
     }
     return variables;
 }
@@ -214,9 +215,10 @@ function updateOutput() {
         varMap.set(v.raw, v);
     });
 
+    const isTextarea = promptOutput && promptOutput.tagName === 'TEXTAREA';
     if (isTextarea) {
         // Single pass replacement
-        promptOutput.value = content.replace(VARIABLE_REGEX, (match, raw) => {
+        promptOutput.value = finalContent.replace(VARIABLE_REGEX, (match, raw) => {
             const v = varMap.get(raw);
             if (v) {
                 return (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
@@ -229,7 +231,7 @@ function updateOutput() {
 
         if (combinedVariableRegex) {
             combinedVariableRegex.lastIndex = 0;
-            while ((match = combinedVariableRegex.exec(content)) !== null) {
+            while ((match = combinedVariableRegex.exec(finalContent)) !== null) {
                 const matchedText = match[0];
                 const rawVar = matchedText.slice(1, -1);
                 const variable = variablesMap.get(rawVar);
@@ -254,12 +256,11 @@ function updateOutput() {
             const { start, end, variable, matchedText } = matches[i];
 
             if (start > lastIndex) {
-                htmlOutput += escapeHTML(content.substring(lastIndex, start));
+                htmlOutput += escapeHTML(finalContent.substring(lastIndex, start));
             }
 
-    if (promptOutput) {
-        variables.forEach(variable => {
             const input = variable.inputElement;
+            const isFilled = input && input.value.trim() !== '';
 
             if (isFilled) {
                 htmlOutput += `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapeHTML(input.value)}</span>`;
@@ -270,11 +271,13 @@ function updateOutput() {
             lastIndex = end;
         }
 
-        if (lastIndex < content.length) {
-            htmlOutput += escapeHTML(content.substring(lastIndex));
+        if (lastIndex < finalContent.length) {
+            htmlOutput += escapeHTML(finalContent.substring(lastIndex));
         }
 
-        promptOutput.innerHTML = htmlOutput;
+        if (promptOutput) {
+            promptOutput.innerHTML = htmlOutput;
+        }
     }
 }
 
