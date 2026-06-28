@@ -5,6 +5,17 @@ let currentPrompt = null;
 let variables = [];
 let combinedVariableRegex = null;
 let variablesMap = new Map();
+
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+};
+const HTML_ESCAPE_CHECK_REGEX = /[&<>'"]/;
+const HTML_ESCAPE_REGEX = /[&<>'"]/g;
+
 function escapeHTML(str) {
     if (!str) return str;
     if (!HTML_ESCAPE_CHECK_REGEX.test(str)) return str;
@@ -86,7 +97,7 @@ function parseVariables(content) {
         variablesMap.clear();
         return [];
     }
-    const localVariables = [];
+    variables = [];
     const seenVars = new Set();
     let match;
 
@@ -123,7 +134,6 @@ function parseVariables(content) {
         };
         localVariables.push(variable);
     }
-    variables = localVariables;
 
     if (variables.length > 0) {
         variablesMap.clear();
@@ -349,7 +359,6 @@ if (typeof module !== 'undefined' && module.exports) {
         renderSidebar,
         parseVariables,
         selectPrompt,
-        parseVariables,
         renderForm,
         updateOutput,
         setPromptsData: (data) => promptsData = data,
