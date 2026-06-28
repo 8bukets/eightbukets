@@ -174,7 +174,7 @@ This is some content. How to Get Maximum Value From This Collection More content
         # Test that path traversal raises PermissionError
         with self.assertRaises(PermissionError) as cm:
             parse_prompts(filename='../foo.txt')
-        self.assertIn("Access denied: Path traversal detected", str(cm.exception))
+        self.assertEqual("Access denied: Path traversal detected for ../foo.txt", str(cm.exception))
 
     @patch("pathlib.Path.relative_to")
     def test_parse_prompts_path_traversal_mock(self, mock_relative_to):
