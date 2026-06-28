@@ -105,11 +105,19 @@ Prompt 01 — Title with leading zero
 Content for 1
 Prompt 999999 —
 Content for empty title
+Prompt — Missing number
+Content for missing number should be part of previous
+Prompt X — Not a number
+Content for not a number
+Prompt 4 Title without em dash
+Content for no em dash
+  Prompt 5 — 🌟 Unicode Title
+Content for Unicode
 """
         result = parse_prompts(mock_data)
         prompts = result["categories"][0]["prompts"]
 
-        self.assertEqual(len(prompts), 2)
+        self.assertEqual(len(prompts), 3)
 
         # Test leading zero ID parses to integer correctly
         self.assertEqual(prompts[0]["id"], 1)
@@ -119,7 +127,16 @@ Content for empty title
         # Test large ID and empty title parses correctly
         self.assertEqual(prompts[1]["id"], 999999)
         self.assertEqual(prompts[1]["title"], "")
-        self.assertEqual(prompts[1]["content"], "Content for empty title")
+
+        # The invalid headers are absorbed as content of the previous valid prompt.
+        self.assertIn("Prompt — Missing number", prompts[1]["content"])
+        self.assertIn("Prompt X — Not a number", prompts[1]["content"])
+        self.assertIn("Prompt 4 Title without em dash", prompts[1]["content"])
+
+        # Test Unicode and leading spaces
+        self.assertEqual(prompts[2]["id"], 5)
+        self.assertEqual(prompts[2]["title"], "🌟 Unicode Title")
+        self.assertEqual(prompts[2]["content"], "Content for Unicode")
 
 if __name__ == '__main__':
     unittest.main()

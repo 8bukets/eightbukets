@@ -174,7 +174,7 @@ This is some content. How to Get Maximum Value From This Collection More content
         # Test that path traversal raises PermissionError
         with self.assertRaises(PermissionError) as cm:
             parse_prompts(filename='../foo.txt')
-        self.assertIn("Access denied: Path traversal detected", str(cm.exception))
+        self.assertEqual("Access denied: Path traversal detected for ../foo.txt", str(cm.exception))
 
     @patch("pathlib.Path.relative_to")
     def test_parse_prompts_path_traversal_mock(self, mock_relative_to):
@@ -222,10 +222,13 @@ This is some content. How to Get Maximum Value From This Collection More content
         self.assertIn("File not found:", str(cm.exception))
         self.assertIn(filename, str(cm.exception))
 
-    def test_missing_file_error_in_parse_prompts(self):
+    @patch("pathlib.Path.is_file")
+    def test_missing_file_error_in_parse_prompts(self, mock_is_file):
+        mock_is_file.return_value = False
         with self.assertRaises(FileNotFoundError) as cm:
             parse_prompts(filename='this_file_definitely_does_not_exist_at_all.txt')
         self.assertIn("File not found:", str(cm.exception))
+        self.assertIn("this_file_definitely_does_not_exist_at_all.txt", str(cm.exception))
 
 if __name__ == '__main__':
     unittest.main()
