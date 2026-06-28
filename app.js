@@ -5,14 +5,21 @@ let currentPrompt = null;
 let variables = [];
 let combinedVariableRegex = null;
 let variablesMap = new Map();
+
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+};
+const HTML_ESCAPE_CHECK_REGEX = /[&<>'"]/;
+const HTML_ESCAPE_REGEX = /[&<>'"]/g;
+
 function escapeHTML(str) {
     if (!str) return str;
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/'/g, '&#39;')
-        .replace(/"/g, '&quot;');
+    if (!HTML_ESCAPE_CHECK_REGEX.test(str)) return str;
+    return str.replace(HTML_ESCAPE_REGEX, (char) => HTML_ESCAPE_MAP[char]);
 }
 
 
@@ -72,14 +79,6 @@ const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VARIABLE_REGEX = /\[(.*?)\]/g;
 const VAR_SEPARATORS = ['—', ':'];
 
-const HTML_ESCAPE_MAP = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-};
-
 
 function parseVariables(content) {
     if (!content) {
@@ -88,7 +87,7 @@ function parseVariables(content) {
         variablesMap.clear();
         return [];
     }
-    const localVariables = [];
+    variables = [];
     const seenVars = new Set();
     let match;
 
@@ -115,17 +114,16 @@ function parseVariables(content) {
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
+        const replaceRegexSource = `\\[${escapedVariable}\\]`;
         variables.push({
             raw: rawVar,
             name: varName,
             hint: varHint,
             replaceRegex: new RegExp(replaceRegexSource, 'g')
-        };
-        localVariables.push(variable);
+        });
 
 
     }
-    variables = localVariables;
 
     if (variables.length > 0) {
         variablesMap.clear();
@@ -134,6 +132,10 @@ function parseVariables(content) {
             const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
             return `\\[${escaped}\\]`;
         });
+
+        // Sort patterns by length descending to match longest variables first
+        patterns.sort((a, b) => b.length - a.length);
+        combinedVariableRegex = new RegExp(`(${patterns.join('|')})`, 'g');
     }
     return variables;
 }
@@ -206,7 +208,8 @@ function renderForm() {
 function updateOutput() {
     if (!currentPrompt) return;
 
-    let finalContent = currentPrompt.content;
+    const content = currentPrompt.content;
+    const isTextarea = promptOutput && (promptOutput.tagName === 'TEXTAREA' || promptOutput.tagName === 'INPUT');
 
     // Optimization: Create a map for quick variable lookup
     const varMap = new Map();
@@ -257,9 +260,8 @@ function updateOutput() {
                 htmlOutput += escapeHTML(content.substring(lastIndex, start));
             }
 
-    if (promptOutput) {
-        variables.forEach(variable => {
             const input = variable.inputElement;
+            const isFilled = input && input.value.trim() !== '';
 
             if (isFilled) {
                 htmlOutput += `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapeHTML(input.value)}</span>`;
@@ -274,7 +276,9 @@ function updateOutput() {
             htmlOutput += escapeHTML(content.substring(lastIndex));
         }
 
-        promptOutput.innerHTML = htmlOutput;
+        if (promptOutput) {
+            promptOutput.innerHTML = htmlOutput;
+        }
     }
 }
 
@@ -345,7 +349,6 @@ if (typeof module !== 'undefined' && module.exports) {
         renderSidebar,
         parseVariables,
         selectPrompt,
-        parseVariables,
         renderForm,
         updateOutput,
         setPromptsData: (data) => promptsData = data,
