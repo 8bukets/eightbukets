@@ -7,12 +7,8 @@ let combinedVariableRegex = null;
 let variablesMap = new Map();
 function escapeHTML(str) {
     if (!str) return str;
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/'/g, '&#39;')
-        .replace(/"/g, '&quot;');
+    if (!HTML_ESCAPE_CHECK_REGEX.test(str)) return str;
+    return str.replace(HTML_ESCAPE_REGEX, (char) => HTML_ESCAPE_MAP[char]);
 }
 
 
@@ -72,6 +68,8 @@ const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VARIABLE_REGEX = /\[(.*?)\]/g;
 const VAR_SEPARATORS = ['—', ':'];
 
+const HTML_ESCAPE_CHECK_REGEX = /[&<>"']/;
+const HTML_ESCAPE_REGEX = /[&<>"']/g;
 const HTML_ESCAPE_MAP = {
     '&': '&amp;',
     '<': '&lt;',
@@ -115,15 +113,15 @@ function parseVariables(content) {
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-        variables.push({
+        const replaceRegexSource = `\\[${escapedVariable}\\]`;
+
+        const variable = {
             raw: rawVar,
             name: varName,
             hint: varHint,
             replaceRegex: new RegExp(replaceRegexSource, 'g')
         };
         localVariables.push(variable);
-
-
     }
     variables = localVariables;
 
@@ -134,6 +132,10 @@ function parseVariables(content) {
             const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
             return `\\[${escaped}\\]`;
         });
+
+        // Sort patterns by length descending to match longest variables first (e.g., [VAR_EXT] before [VAR])
+        patterns.sort((a, b) => b.length - a.length);
+        combinedVariableRegex = new RegExp(`(${patterns.join('|')})`, 'g');
     }
     return variables;
 }
@@ -204,18 +206,19 @@ function renderForm() {
 
 // Update Textarea Output
 function updateOutput() {
-    if (!currentPrompt) return;
+    if (!currentPrompt || !promptOutput) return;
 
-    let finalContent = currentPrompt.content;
-
-    // Optimization: Create a map for quick variable lookup
-    const varMap = new Map();
-    variables.forEach(v => {
-        varMap.set(v.raw, v);
-    });
+    const content = currentPrompt.content;
+    const isTextarea = promptOutput.tagName === 'TEXTAREA' || promptOutput.nodeName === 'TEXTAREA';
 
     if (isTextarea) {
-        // Single pass replacement
+        // Optimization: Create a map for quick variable lookup
+        const varMap = new Map();
+        variables.forEach(v => {
+            varMap.set(v.raw, v);
+        });
+
+        // Single pass replacement for textarea
         promptOutput.value = content.replace(VARIABLE_REGEX, (match, raw) => {
             const v = varMap.get(raw);
             if (v) {
@@ -246,7 +249,6 @@ function updateOutput() {
 
         matches.sort((a, b) => a.start - b.start);
 
-        // Clear efficiently
         let htmlOutput = '';
         let lastIndex = 0;
 
@@ -257,9 +259,8 @@ function updateOutput() {
                 htmlOutput += escapeHTML(content.substring(lastIndex, start));
             }
 
-    if (promptOutput) {
-        variables.forEach(variable => {
             const input = variable.inputElement;
+            const isFilled = input && input.value.trim() !== '';
 
             if (isFilled) {
                 htmlOutput += `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapeHTML(input.value)}</span>`;
