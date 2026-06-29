@@ -209,15 +209,9 @@ function updateOutput() {
     const isTextarea = promptOutput.tagName === 'TEXTAREA' || promptOutput.nodeName === 'TEXTAREA';
 
     if (isTextarea) {
-        // Optimization: Create a map for quick variable lookup
-        const varMap = new Map();
-        variables.forEach(v => {
-            varMap.set(v.raw, v);
-        });
-
-        // Single pass replacement for textarea
+        // Single pass replacement for textarea using pre-computed variablesMap
         promptOutput.value = content.replace(VARIABLE_REGEX, (match, raw) => {
-            const v = varMap.get(raw);
+            const v = variablesMap.get(raw);
             if (v) {
                 return (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
             }
