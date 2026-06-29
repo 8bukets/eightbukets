@@ -111,6 +111,118 @@ describe('Prompts Library Error Handling', () => {
     });
 });
 
+
+describe('Prompts Library Successful Initialization', () => {
+    let app;
+    let oldFetch;
+
+    beforeAll(() => {
+        oldFetch = global.fetch;
+    });
+
+    afterAll(() => {
+        global.fetch = oldFetch;
+    });
+
+    beforeEach(() => {
+        const html = require('fs').readFileSync(require('path').resolve(__dirname, './index.html'), 'utf8');
+        const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
+        document.documentElement.innerHTML = cleanHtml;
+        global.fetch = jest.fn();
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        jest.resetModules();
+        document.documentElement.innerHTML = '';
+        jest.restoreAllMocks();
+    });
+
+    test('should successfully fetch prompts, pre-compute fields, and render sidebar', async () => {
+        const mockData = {
+            categories: [
+                {
+                    name: 'Testing Category',
+                    prompts: [
+                        { id: '1', title: 'Test Prompt 1', content: 'Test Content 1' },
+                        { id: '2', title: 'Test Prompt 2', content: 'Test Content 2' }
+                    ]
+                }
+            ]
+        };
+
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: async () => mockData
+        });
+
+        jest.isolateModules(() => {
+            app = require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick);
+
+        expect(global.fetch).toHaveBeenCalledWith('prompts.json');
+
+        expect(mockData.categories[0].prompts[0].titleLower).toBe('test prompt 1');
+        expect(mockData.categories[0].prompts[0].contentLower).toBe('test content 1');
+
+        const sidebarContent = document.getElementById('sidebar-content');
+        const categoryHeaders = sidebarContent.querySelectorAll('h3');
+        const promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
+
+        expect(categoryHeaders.length).toBe(1);
+        expect(categoryHeaders[0].textContent).toBe('Testing Category');
+
+        expect(promptButtons.length).toBe(2);
+        expect(promptButtons[0].textContent).toBe('Test Prompt 1');
+        expect(promptButtons[1].textContent).toBe('Test Prompt 2');
+    });
+
+    test('should handle prompts with missing title or content safely', async () => {
+        const mockDataEdge = {
+            categories: [
+                {
+                    name: 'Edge Cases',
+                    prompts: [
+                        { id: '3', title: 'Only Title' },
+                        { id: '4', content: 'Only Content' },
+                        { id: '5' }
+                    ]
+                }
+            ]
+        };
+
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: async () => mockDataEdge
+        });
+
+        jest.isolateModules(() => {
+            app = require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick);
+
+        expect(mockDataEdge.categories[0].prompts[0].titleLower).toBe('only title');
+        expect(mockDataEdge.categories[0].prompts[0].contentLower).toBeUndefined();
+
+        expect(mockDataEdge.categories[0].prompts[1].titleLower).toBeUndefined();
+        expect(mockDataEdge.categories[0].prompts[1].contentLower).toBe('only content');
+
+        expect(mockDataEdge.categories[0].prompts[2].titleLower).toBeUndefined();
+        expect(mockDataEdge.categories[0].prompts[2].contentLower).toBeUndefined();
+    });
+});
+
 describe('renderSidebar', () => {
     let app;
     let sidebarContent;
@@ -132,6 +244,7 @@ describe('renderSidebar', () => {
     ];
 
     beforeEach(() => {
+        jest.spyOn(console, 'error').mockImplementation(() => {});
         // Load the HTML into JSDOM before each test to reset DOM
         const html = fs.readFileSync(require('path').resolve(__dirname, './index.html'), 'utf8');
         const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
@@ -147,6 +260,7 @@ describe('renderSidebar', () => {
     });
 
     afterEach(() => {
+        if (console.error.mockRestore) console.error.mockRestore();
         jest.resetModules();
         document.documentElement.innerHTML = '';
     });
