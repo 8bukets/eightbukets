@@ -77,7 +77,6 @@ function renderSidebar(categories, filterText = '') {
 // Pre-compile RegExp to avoid recreation inside loops
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VARIABLE_REGEX = /\[(.*?)\]/g;
-const VAR_SEPARATORS = ['—', ':'];
 
 function parseVariables(content) {
     if (!content) {
@@ -113,7 +112,6 @@ function parseVariables(content) {
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-        const replaceRegexSource = `\\[${escapedVariable}\\]`;
 
         const variable = {
             raw: rawVar,
