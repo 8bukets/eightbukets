@@ -111,6 +111,143 @@ describe('Prompts Library Error Handling', () => {
     });
 });
 
+describe('Clipboard Copy Functionality', () => {
+    let originalClipboard;
+
+    beforeAll(() => {
+        originalClipboard = global.navigator.clipboard;
+    });
+
+    afterAll(() => {
+        if (originalClipboard === undefined) {
+            delete global.navigator.clipboard;
+        } else {
+            Object.defineProperty(global.navigator, 'clipboard', {
+                value: originalClipboard,
+                configurable: true
+            });
+        }
+    });
+
+    beforeEach(() => {
+        const html = fs.readFileSync(path.resolve(__dirname, './index.html'), 'utf8');
+        const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
+        document.documentElement.innerHTML = cleanHtml;
+
+        // Mock fetch to prevent network errors in DOMContentLoaded
+        global.fetch = jest.fn(() => Promise.resolve({
+            json: () => Promise.resolve({ categories: [] })
+        }));
+
+        // Create the clipboard property on navigator if it doesn't exist yet for JSDOM
+        if (!global.navigator.clipboard) {
+            Object.defineProperty(global.navigator, 'clipboard', {
+                value: {},
+                writable: true,
+                configurable: true
+            });
+        }
+    });
+
+    afterEach(() => {
+        jest.resetModules();
+        document.documentElement.innerHTML = '';
+        jest.clearAllMocks();
+    });
+
+    test('should log error when navigator.clipboard.writeText fails', async () => {
+        // Setup clipboard mock to reject
+        const mockError = new Error('Clipboard denied');
+        let rejectPromise;
+        const writeTextPromise = new Promise((resolve, reject) => {
+            rejectPromise = () => reject(mockError);
+        });
+
+        global.navigator.clipboard.writeText = jest.fn().mockReturnValue(writeTextPromise);
+
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        // Require app.js to attach event listeners
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        // Trigger DOMContentLoaded
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+        await new Promise(process.nextTick);
+
+        // Setup test DOM state
+        const copyBtn = document.getElementById('copy-btn');
+        const promptOutput = document.getElementById('prompt-output');
+
+        // Ensure there is text to copy so the if (textToCopy) check passes
+        promptOutput.textContent = 'Test prompt content';
+
+        // Trigger the click event
+        copyBtn.click();
+
+        // Reject the promise
+        rejectPromise();
+
+        // Wait for the clipboard promise to reject and the catch block to run
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick);
+
+        expect(global.navigator.clipboard.writeText).toHaveBeenCalledWith('Test prompt content');
+        expect(consoleSpy).toHaveBeenCalledWith('Failed to copy: ', mockError);
+
+        consoleSpy.mockRestore();
+    });
+
+    test('should show copy toast on successful copy', async () => {
+        let resolvePromise;
+        const writeTextPromise = new Promise(resolve => {
+            resolvePromise = resolve;
+        });
+        global.navigator.clipboard.writeText = jest.fn().mockReturnValue(writeTextPromise);
+
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+        await new Promise(process.nextTick);
+
+        jest.useFakeTimers();
+
+        const copyBtn = document.getElementById('copy-btn');
+        const promptOutput = document.getElementById('prompt-output');
+        const copyToast = document.getElementById('copy-toast');
+
+        promptOutput.textContent = 'Test prompt content';
+
+        copyBtn.click();
+
+        // Resolve the promise
+        resolvePromise();
+
+        // Let promises resolve before advancing timers
+        // Since we are using fake timers, we need to ensure the event loop runs
+        // to process the promise microtasks
+        for (let i = 0; i < 5; i++) {
+            await Promise.resolve();
+        }
+
+        expect(global.navigator.clipboard.writeText).toHaveBeenCalledWith('Test prompt content');
+        expect(copyToast.style.opacity).toBe('1');
+
+        // Fast-forward timeout to check toast hiding
+        jest.advanceTimersByTime(2000);
+        // Let promises resolve
+        await Promise.resolve();
+        expect(copyToast.style.opacity).toBe('0');
+
+        jest.useRealTimers();
+    });
+});
+
 describe('renderSidebar', () => {
     let app;
     let sidebarContent;
