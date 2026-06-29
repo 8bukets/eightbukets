@@ -79,17 +79,6 @@ const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VARIABLE_REGEX = /\[(.*?)\]/g;
 const VAR_SEPARATORS = ['—', ':'];
 
-const HTML_ESCAPE_CHECK_REGEX = /[&<>"']/;
-const HTML_ESCAPE_REGEX = /[&<>"']/g;
-const HTML_ESCAPE_MAP = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-};
-
-
 function parseVariables(content) {
     if (!content) {
         variables = [];
@@ -132,7 +121,7 @@ function parseVariables(content) {
             hint: varHint,
             replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
         };
-        localVariables.push(variable);
+        variables.push(variable);
     }
 
     if (variables.length > 0) {
@@ -221,7 +210,6 @@ function updateOutput() {
     const content = currentPrompt.content;
     const isTextarea = promptOutput.tagName === 'TEXTAREA' || promptOutput.nodeName === 'TEXTAREA';
 
-    const isTextarea = promptOutput && promptOutput.tagName === 'TEXTAREA';
     if (isTextarea) {
         // Optimization: Create a map for quick variable lookup
         const varMap = new Map();
@@ -240,6 +228,7 @@ function updateOutput() {
     } else {
         const matches = [];
         let match;
+        const finalContent = content; // ReferenceError fix
 
         if (combinedVariableRegex) {
             combinedVariableRegex.lastIndex = 0;
