@@ -81,12 +81,11 @@ const VAR_SEPARATORS = ['—', ':'];
 
 function parseVariables(content) {
     if (!content) {
-        variables = [];
         combinedVariableRegex = null;
         variablesMap.clear();
         return [];
     }
-    variables = [];
+    const localVariables = [];
     const seenVars = new Set();
     let match;
 
@@ -113,7 +112,6 @@ function parseVariables(content) {
         }
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-        const replaceRegexSource = `\\[${escapedVariable}\\]`;
 
         const variable = {
             raw: rawVar,
@@ -121,12 +119,12 @@ function parseVariables(content) {
             hint: varHint,
             replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
         };
-        variables.push(variable);
+        localVariables.push(variable);
     }
 
-    if (variables.length > 0) {
+    if (localVariables.length > 0) {
         variablesMap.clear();
-        const patterns = variables.map(v => {
+        const patterns = localVariables.map(v => {
             variablesMap.set(v.raw, v);
             const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
             return `\\[${escaped}\\]`;
@@ -135,8 +133,11 @@ function parseVariables(content) {
         // Sort patterns by length descending to match longest variables first (e.g., [VAR_EXT] before [VAR])
         patterns.sort((a, b) => b.length - a.length);
         combinedVariableRegex = new RegExp(`(${patterns.join('|')})`, 'g');
+    } else {
+        variablesMap.clear();
+        combinedVariableRegex = null;
     }
-    return variables;
+    return localVariables;
 }
 
 // Select a prompt
@@ -361,6 +362,7 @@ if (typeof module !== 'undefined' && module.exports) {
         setPromptTitle: (el) => promptTitle = el,
         setPromptCategory: (el) => promptCategory = el,
         setPromptWorkspace: (el) => promptWorkspace = el,
-        setWelcomeMessage: (el) => welcomeMessage = el
+            setWelcomeMessage: (el) => welcomeMessage = el,
+            setVariables: (vars) => variables = vars
     };
 }
