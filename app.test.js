@@ -45,6 +45,46 @@ describe('Prompts Library Error Handling', () => {
         // But for a single test suite, resetting modules is the most important part
     });
 
+
+    test('should successfully load and parse prompts.json', async () => {
+        const mockData = {
+            categories: [
+                {
+                    name: 'Test Category',
+                    prompts: [
+                        { id: '1', title: 'Test Prompt', content: 'Test Content' }
+                    ]
+                }
+            ]
+        };
+
+        const mockResponse = {
+            json: jest.fn().mockResolvedValueOnce(mockData)
+        };
+        global.fetch.mockResolvedValueOnce(mockResponse);
+
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick); // Extra tick for json() resolution
+
+        expect(global.fetch).toHaveBeenCalledWith('prompts.json');
+
+        // Verify that the lowercase properties were added
+        expect(mockData.categories[0].prompts[0].titleLower).toBe('test prompt');
+        expect(mockData.categories[0].prompts[0].contentLower).toBe('test content');
+
+        // Verify the DOM was updated
+        const sidebarContent = document.getElementById('sidebar-content');
+        expect(sidebarContent.innerHTML).toContain('Test Category');
+        expect(sidebarContent.innerHTML).toContain('Test Prompt');
+    });
+
     test('should show error message when fetching prompts.json fails', async () => {
         // Mock fetch to reject with an error
         const mockError = new Error('Network error');
@@ -78,6 +118,69 @@ describe('Prompts Library Error Handling', () => {
         const sidebarContent = document.getElementById('sidebar-content');
         expect(sidebarContent.innerHTML).toContain('Failed to load prompts.');
         expect(sidebarContent.innerHTML).toContain('text-red-500');
+
+        consoleSpy.mockRestore();
+    });
+
+
+    test('should show error message when JSON parsing fails', async () => {
+        const mockError = new Error('Invalid JSON');
+        const mockResponse = {
+            json: jest.fn().mockRejectedValueOnce(mockError)
+        };
+        global.fetch.mockResolvedValueOnce(mockResponse);
+
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick);
+
+        expect(global.fetch).toHaveBeenCalledWith('prompts.json');
+        expect(consoleSpy).toHaveBeenCalledWith('Error loading prompts:', mockError);
+
+        const sidebarContent = document.getElementById('sidebar-content');
+        expect(sidebarContent.innerHTML).toContain('Failed to load prompts.');
+        expect(sidebarContent.innerHTML).toContain('text-red-500');
+
+        consoleSpy.mockRestore();
+    });
+
+
+    test('should handle missing categories array in JSON response safely', async () => {
+        const mockData = {
+            // categories is missing
+        };
+        const mockResponse = {
+            json: jest.fn().mockResolvedValueOnce(mockData)
+        };
+        global.fetch.mockResolvedValueOnce(mockResponse);
+
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick);
+
+        expect(global.fetch).toHaveBeenCalledWith('prompts.json');
+
+        // It should have thrown a TypeError because data.categories is undefined, triggering the catch block
+        expect(consoleSpy).toHaveBeenCalledWith('Error loading prompts:', expect.any(TypeError));
+
+        const sidebarContent = document.getElementById('sidebar-content');
+        expect(sidebarContent.innerHTML).toContain('Failed to load prompts.');
 
         consoleSpy.mockRestore();
     });
