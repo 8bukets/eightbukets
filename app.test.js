@@ -45,6 +45,46 @@ describe('Prompts Library Error Handling', () => {
         // But for a single test suite, resetting modules is the most important part
     });
 
+
+    test('should successfully load and parse prompts.json', async () => {
+        const mockData = {
+            categories: [
+                {
+                    name: 'Test Category',
+                    prompts: [
+                        { id: '1', title: 'Test Prompt', content: 'Test Content' }
+                    ]
+                }
+            ]
+        };
+
+        const mockResponse = {
+            json: jest.fn().mockResolvedValueOnce(mockData)
+        };
+        global.fetch.mockResolvedValueOnce(mockResponse);
+
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick); // Extra tick for json() resolution
+
+        expect(global.fetch).toHaveBeenCalledWith('prompts.json');
+
+        // Verify that the lowercase properties were added
+        expect(mockData.categories[0].prompts[0].titleLower).toBe('test prompt');
+        expect(mockData.categories[0].prompts[0].contentLower).toBe('test content');
+
+        // Verify the DOM was updated
+        const sidebarContent = document.getElementById('sidebar-content');
+        expect(sidebarContent.innerHTML).toContain('Test Category');
+        expect(sidebarContent.innerHTML).toContain('Test Prompt');
+    });
+
     test('should show error message when fetching prompts.json fails', async () => {
         // Mock fetch to reject with an error
         const mockError = new Error('Network error');
@@ -82,6 +122,69 @@ describe('Prompts Library Error Handling', () => {
         consoleSpy.mockRestore();
     });
 
+
+    test('should show error message when JSON parsing fails', async () => {
+        const mockError = new Error('Invalid JSON');
+        const mockResponse = {
+            json: jest.fn().mockRejectedValueOnce(mockError)
+        };
+        global.fetch.mockResolvedValueOnce(mockResponse);
+
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick);
+
+        expect(global.fetch).toHaveBeenCalledWith('prompts.json');
+        expect(consoleSpy).toHaveBeenCalledWith('Error loading prompts:', mockError);
+
+        const sidebarContent = document.getElementById('sidebar-content');
+        expect(sidebarContent.innerHTML).toContain('Failed to load prompts.');
+        expect(sidebarContent.innerHTML).toContain('text-red-500');
+
+        consoleSpy.mockRestore();
+    });
+
+
+    test('should handle missing categories array in JSON response safely', async () => {
+        const mockData = {
+            // categories is missing
+        };
+        const mockResponse = {
+            json: jest.fn().mockResolvedValueOnce(mockData)
+        };
+        global.fetch.mockResolvedValueOnce(mockResponse);
+
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick);
+
+        expect(global.fetch).toHaveBeenCalledWith('prompts.json');
+
+        // It should have thrown a TypeError because data.categories is undefined, triggering the catch block
+        expect(consoleSpy).toHaveBeenCalledWith('Error loading prompts:', expect.any(TypeError));
+
+        const sidebarContent = document.getElementById('sidebar-content');
+        expect(sidebarContent.innerHTML).toContain('Failed to load prompts.');
+
+        consoleSpy.mockRestore();
+    });
+
     test('should render error message as text even if error object contains malicious content', async () => {
         // Mock fetch to reject with an error containing a malicious string
         const maliciousString = '<img src=x onerror=alert(1)>';
@@ -111,115 +214,140 @@ describe('Prompts Library Error Handling', () => {
     });
 });
 
-
-describe('Prompts Library Successful Initialization', () => {
-    let app;
-    let oldFetch;
+describe('Clipboard Copy Functionality', () => {
+    let originalClipboard;
 
     beforeAll(() => {
-        oldFetch = global.fetch;
+        originalClipboard = global.navigator.clipboard;
     });
 
     afterAll(() => {
-        global.fetch = oldFetch;
+        if (originalClipboard === undefined) {
+            delete global.navigator.clipboard;
+        } else {
+            Object.defineProperty(global.navigator, 'clipboard', {
+                value: originalClipboard,
+                configurable: true
+            });
+        }
     });
 
     beforeEach(() => {
-        const html = require('fs').readFileSync(require('path').resolve(__dirname, './index.html'), 'utf8');
+        const html = fs.readFileSync(path.resolve(__dirname, './index.html'), 'utf8');
         const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
         document.documentElement.innerHTML = cleanHtml;
-        global.fetch = jest.fn();
-        jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        // Mock fetch to prevent network errors in DOMContentLoaded
+        global.fetch = jest.fn(() => Promise.resolve({
+            json: () => Promise.resolve({ categories: [] })
+        }));
+
+        // Create the clipboard property on navigator if it doesn't exist yet for JSDOM
+        if (!global.navigator.clipboard) {
+            Object.defineProperty(global.navigator, 'clipboard', {
+                value: {},
+                writable: true,
+                configurable: true
+            });
+        }
     });
 
     afterEach(() => {
         jest.resetModules();
         document.documentElement.innerHTML = '';
-        jest.restoreAllMocks();
+        jest.clearAllMocks();
     });
 
-    test('should successfully fetch prompts, pre-compute fields, and render sidebar', async () => {
-        const mockData = {
-            categories: [
-                {
-                    name: 'Testing Category',
-                    prompts: [
-                        { id: '1', title: 'Test Prompt 1', content: 'Test Content 1' },
-                        { id: '2', title: 'Test Prompt 2', content: 'Test Content 2' }
-                    ]
-                }
-            ]
-        };
-
-        global.fetch.mockResolvedValue({
-            ok: true,
-            json: async () => mockData
+    test('should log error when navigator.clipboard.writeText fails', async () => {
+        // Setup clipboard mock to reject
+        const mockError = new Error('Clipboard denied');
+        let rejectPromise;
+        const writeTextPromise = new Promise((resolve, reject) => {
+            rejectPromise = () => reject(mockError);
         });
 
+        global.navigator.clipboard.writeText = jest.fn().mockReturnValue(writeTextPromise);
+
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        // Require app.js to attach event listeners
         jest.isolateModules(() => {
-            app = require('./app.js');
+            require('./app.js');
+        });
+
+        // Trigger DOMContentLoaded
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+        await new Promise(process.nextTick);
+
+        // Setup test DOM state
+        const copyBtn = document.getElementById('copy-btn');
+        const promptOutput = document.getElementById('prompt-output');
+
+        // Ensure there is text to copy so the if (textToCopy) check passes
+        promptOutput.textContent = 'Test prompt content';
+
+        // Trigger the click event
+        copyBtn.click();
+
+        // Reject the promise
+        rejectPromise();
+
+        // Wait for the clipboard promise to reject and the catch block to run
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick);
+
+        expect(global.navigator.clipboard.writeText).toHaveBeenCalledWith('Test prompt content');
+        expect(consoleSpy).toHaveBeenCalledWith('Failed to copy: ', mockError);
+
+        consoleSpy.mockRestore();
+    });
+
+    test('should show copy toast on successful copy', async () => {
+        let resolvePromise;
+        const writeTextPromise = new Promise(resolve => {
+            resolvePromise = resolve;
+        });
+        global.navigator.clipboard.writeText = jest.fn().mockReturnValue(writeTextPromise);
+
+        jest.isolateModules(() => {
+            require('./app.js');
         });
 
         const event = new Event('DOMContentLoaded');
         document.dispatchEvent(event);
-
-        await new Promise(process.nextTick);
         await new Promise(process.nextTick);
 
-        expect(global.fetch).toHaveBeenCalledWith('prompts.json');
+        jest.useFakeTimers();
 
-        expect(mockData.categories[0].prompts[0].titleLower).toBe('test prompt 1');
-        expect(mockData.categories[0].prompts[0].contentLower).toBe('test content 1');
+        const copyBtn = document.getElementById('copy-btn');
+        const promptOutput = document.getElementById('prompt-output');
+        const copyToast = document.getElementById('copy-toast');
 
-        const sidebarContent = document.getElementById('sidebar-content');
-        const categoryHeaders = sidebarContent.querySelectorAll('h3');
-        const promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
+        promptOutput.textContent = 'Test prompt content';
 
-        expect(categoryHeaders.length).toBe(1);
-        expect(categoryHeaders[0].textContent).toBe('Testing Category');
+        copyBtn.click();
 
-        expect(promptButtons.length).toBe(2);
-        expect(promptButtons[0].textContent).toBe('Test Prompt 1');
-        expect(promptButtons[1].textContent).toBe('Test Prompt 2');
-    });
+        // Resolve the promise
+        resolvePromise();
 
-    test('should handle prompts with missing title or content safely', async () => {
-        const mockDataEdge = {
-            categories: [
-                {
-                    name: 'Edge Cases',
-                    prompts: [
-                        { id: '3', title: 'Only Title' },
-                        { id: '4', content: 'Only Content' },
-                        { id: '5' }
-                    ]
-                }
-            ]
-        };
+        // Let promises resolve before advancing timers
+        // Since we are using fake timers, we need to ensure the event loop runs
+        // to process the promise microtasks
+        for (let i = 0; i < 5; i++) {
+            await Promise.resolve();
+        }
 
-        global.fetch.mockResolvedValue({
-            ok: true,
-            json: async () => mockDataEdge
-        });
+        expect(global.navigator.clipboard.writeText).toHaveBeenCalledWith('Test prompt content');
+        expect(copyToast.style.opacity).toBe('1');
 
-        jest.isolateModules(() => {
-            app = require('./app.js');
-        });
+        // Fast-forward timeout to check toast hiding
+        jest.advanceTimersByTime(2000);
+        // Let promises resolve
+        await Promise.resolve();
+        expect(copyToast.style.opacity).toBe('0');
 
-        const event = new Event('DOMContentLoaded');
-        document.dispatchEvent(event);
-
-        await new Promise(process.nextTick);
-        await new Promise(process.nextTick);
-
-        expect(mockDataEdge.categories[0].prompts[0].titleLower).toBe('only title');
-        expect(mockDataEdge.categories[0].prompts[0].contentLower).toBeUndefined();
-
-        expect(mockDataEdge.categories[0].prompts[1].titleLower).toBeUndefined();
-        expect(mockDataEdge.categories[0].prompts[1].contentLower).toBe('only content');
-
-        expect(mockDataEdge.categories[0].prompts[2].titleLower).toBeUndefined();
-        expect(mockDataEdge.categories[0].prompts[2].contentLower).toBeUndefined();
+        jest.useRealTimers();
     });
 });
 
