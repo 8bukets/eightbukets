@@ -372,6 +372,7 @@ describe('renderSidebar', () => {
     ];
 
     beforeEach(() => {
+        jest.spyOn(console, 'error').mockImplementation(() => {});
         // Load the HTML into JSDOM before each test to reset DOM
         const html = fs.readFileSync(require('path').resolve(__dirname, './index.html'), 'utf8');
         const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
@@ -387,6 +388,7 @@ describe('renderSidebar', () => {
     });
 
     afterEach(() => {
+        if (console.error.mockRestore) console.error.mockRestore();
         jest.resetModules();
         document.documentElement.innerHTML = '';
     });
