@@ -90,4 +90,13 @@ describe('parseVariables function', () => {
         );
         expect(content.replace(result[0].replaceRegex, 'Alice')).toBe("Hello Alice.");
     });
+
+    test('should handle hints containing separator characters', () => {
+        const content = "Visit [URL: http://localhost:3000].";
+        const result = parseVariables(content);
+        expect(result).toMatchObject([
+            { raw: 'URL: http://localhost:3000', name: 'URL', hint: 'http://localhost:3000' }
+        ]);
+        expect(content.replace(result[0].replaceRegex, 'example.com')).toBe("Visit example.com.");
+    });
 });

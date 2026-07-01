@@ -1,10 +1,21 @@
 import json
-import os
+from pathlib import Path
 import re
 
-def parse_prompts(data=None):
+def parse_prompts(data=None, filename='prompts.txt'):
     if data is None:
-        filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prompts.txt')
+        base_dir = Path(__file__).resolve().parent
+        filepath = (base_dir / filename).resolve()
+
+        # Security check: Ensure the resolved path is within the base directory to prevent path traversal
+        try:
+            filepath.relative_to(base_dir)
+        except ValueError:
+            raise PermissionError(f"Access denied: Path traversal detected for {filename}")
+
+        if not filepath.is_file():
+            raise FileNotFoundError(f"File not found: {filepath}")
+
         with open(filepath, 'r', encoding='utf-8') as f:
             data = f.read()
 
@@ -14,7 +25,7 @@ def parse_prompts(data=None):
     parts = re.split(r'Part \d+: (.*) \(Prompts \d+–\d+\)', data)
     # The first element is empty string before Part 1
 
-    prompt_regex = re.compile(r'Prompt (\d+) — (.*)')
+    prompt_regex = re.compile(r'^\s*Prompt (\d+) — ?(.*)', flags=re.MULTILINE)
 
     for i in range(1, len(parts), 2):
         category_name = parts[i].strip()
@@ -27,10 +38,7 @@ def parse_prompts(data=None):
         for j in range(1, len(prompt_blocks), 3):
             pid = int(prompt_blocks[j])
             title = prompt_blocks[j+1].strip()
-            content = prompt_blocks[j+2].strip()
-
-            if "How to Get Maximum Value From This Collection" in content:
-                content = content.replace("How to Get Maximum Value From This Collection", "").strip()
+            content = prompt_blocks[j+2].replace("How to Get Maximum Value From This Collection", "").strip()
 
             prompts.append({
                 "id": pid,

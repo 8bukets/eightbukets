@@ -1,42 +1,45 @@
 const { escapeHTML } = require('./app.js');
 
 describe('escapeHTML function', () => {
-    test('returns original string when there are no special characters', () => {
-        expect(escapeHTML('Hello World')).toBe('Hello World');
-    });
-
-    test('escapes ampersand (&)', () => {
-        expect(escapeHTML('Peanut Butter & Jelly')).toBe('Peanut Butter &amp; Jelly');
-    });
-
-    test('escapes less than (<)', () => {
-        expect(escapeHTML('1 < 2')).toBe('1 &lt; 2');
-    });
-
-    test('escapes greater than (>)', () => {
-        expect(escapeHTML('2 > 1')).toBe('2 &gt; 1');
-    });
-
-    test('escapes single quote (\')', () => {
-        expect(escapeHTML("It's a beautiful day")).toBe('It&#39;s a beautiful day');
-    });
-
-    test('escapes double quote (")', () => {
-        expect(escapeHTML('He said "Hello"')).toBe('He said &quot;Hello&quot;');
-    });
-
-    test('escapes multiple occurrences of the same character', () => {
-        expect(escapeHTML('&&&&')).toBe('&amp;&amp;&amp;&amp;');
-    });
-
-    test('escapes multiple different characters in a complex string', () => {
-        expect(escapeHTML('<script>alert("XSS & \'attack\'")</script>'))
-            .toBe('&lt;script&gt;alert(&quot;XSS &amp; &#39;attack&#39;&quot;)&lt;/script&gt;');
-    });
-
-    test('returns falsy inputs as is', () => {
-        expect(escapeHTML(null)).toBeNull();
-        expect(escapeHTML(undefined)).toBeUndefined();
+    test('should return empty/falsy values unmodified', () => {
         expect(escapeHTML('')).toBe('');
+        expect(escapeHTML(null)).toBe(null);
+        expect(escapeHTML(undefined)).toBe(undefined);
+    });
+
+    test('should return strings without HTML characters unmodified', () => {
+        expect(escapeHTML('hello world')).toBe('hello world');
+        expect(escapeHTML('12345')).toBe('12345');
+        expect(escapeHTML('no special chars!')).toBe('no special chars!');
+    });
+
+    test('should escape ampersand (&)', () => {
+        expect(escapeHTML('a & b')).toBe('a &amp; b');
+    });
+
+    test('should escape less than (<)', () => {
+        expect(escapeHTML('a < b')).toBe('a &lt; b');
+    });
+
+    test('should escape greater than (>)', () => {
+        expect(escapeHTML('a > b')).toBe('a &gt; b');
+    });
+
+    test('should escape double quotes (")', () => {
+        expect(escapeHTML('say "hello"')).toBe('say &quot;hello&quot;');
+    });
+
+    test('should escape single quotes (\')', () => {
+        expect(escapeHTML("say 'hello'")).toBe("say &#39;hello&#39;");
+    });
+
+    test('should escape mixed HTML characters', () => {
+        const input = `<script>alert("XSS & 'injection'")</script>`;
+        const expected = `&lt;script&gt;alert(&quot;XSS &amp; &#39;injection&#39;&quot;)&lt;/script&gt;`;
+        expect(escapeHTML(input)).toBe(expected);
+    });
+
+    test('should escape multiple occurrences of the same character', () => {
+        expect(escapeHTML('<<<>>>&&&""\'\'')).toBe('&lt;&lt;&lt;&gt;&gt;&gt;&amp;&amp;&amp;&quot;&quot;&#39;&#39;');
     });
 });
