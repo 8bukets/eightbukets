@@ -272,7 +272,6 @@ function updateOutput() {
         if (promptOutput) {
             promptOutput.innerHTML = htmlOutput;
         }
-        promptOutput.innerHTML = htmlResult;
     }
 }
 
