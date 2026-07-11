@@ -6,6 +6,19 @@ let variables = [];
 let combinedVariableRegex = null;
 let variablesMap = new Map();
 
+// Utility function to debounce function calls
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 const HTML_ESCAPE_MAP = {
     '&': '&amp;',
     '<': '&lt;',
@@ -311,9 +324,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Search functionality
     if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
+        searchInput.addEventListener('input', debounce((e) => {
             renderSidebar(promptsData, e.target.value);
-        });
+        }, 300));
     }
 
     // Copy to Clipboard
@@ -338,6 +351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+        debounce,
         escapeHTML,
         renderSidebar,
         parseVariables,
