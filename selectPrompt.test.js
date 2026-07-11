@@ -157,4 +157,39 @@ describe('selectPrompt function', () => {
             app.selectPrompt(null, 'Category');
         }).not.toThrow();
     });
+
+    test('should throw TypeError when given a malformed prompt object', () => {
+        // Missing content
+        const missingContentPrompt = { id: '1', title: 'Test' };
+        expect(() => {
+            app.selectPrompt(missingContentPrompt, 'Category');
+        }).toThrow(TypeError);
+        expect(() => {
+            app.selectPrompt(missingContentPrompt, 'Category');
+        }).toThrow('Invalid prompt object: missing or invalid required properties (id, title, content)');
+
+        // Missing id
+        const missingIdPrompt = { title: 'Test', content: 'Test content' };
+        expect(() => {
+            app.selectPrompt(missingIdPrompt, 'Category');
+        }).toThrow(TypeError);
+
+        // Missing title
+        const missingTitlePrompt = { id: '1', content: 'Test content' };
+        expect(() => {
+            app.selectPrompt(missingTitlePrompt, 'Category');
+        }).toThrow(TypeError);
+
+        // Invalid type for content
+        const invalidContentTypePrompt = { id: '1', title: 'Test', content: null };
+        expect(() => {
+            app.selectPrompt(invalidContentTypePrompt, 'Category');
+        }).toThrow(TypeError);
+
+        // Completely invalid object
+        const completelyInvalidPrompt = { somethingElse: true };
+        expect(() => {
+            app.selectPrompt(completelyInvalidPrompt, 'Category');
+        }).toThrow(TypeError);
+    });
 });
