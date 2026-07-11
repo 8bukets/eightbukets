@@ -45,4 +45,8 @@ function runBenchmark() {
     return end - start;
 }
 
-runBenchmark();
+if (require.main === module) {
+    runBenchmark();
+}
+
+module.exports = { runBenchmark, ITERATIONS };
