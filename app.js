@@ -142,6 +142,12 @@ function parseVariables(content) {
 // Select a prompt
 function selectPrompt(prompt, categoryName) {
     if (!prompt) return;
+
+    // Validate prompt object shape
+    if (typeof prompt !== 'object' || !prompt.id || !prompt.title || typeof prompt.content !== 'string') {
+        throw new TypeError('Invalid prompt object: missing or invalid required properties (id, title, content)');
+    }
+
     currentPrompt = prompt;
 
     // Re-render sidebar to update highlighting
