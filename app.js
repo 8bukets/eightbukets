@@ -78,10 +78,26 @@ function renderSidebar(categories, filterText = '') {
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VARIABLE_REGEX = /\[(.*?)\]/g;
 
+function updateGlobalVariableStates(localVariables) {
+    variablesMap.clear();
+    if (!localVariables || localVariables.length === 0) {
+        combinedVariableRegex = null;
+        return;
+    }
+
+    const patterns = localVariables.map(v => {
+        variablesMap.set(v.raw, v);
+        const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
+        return `\\[${escaped}\\]`;
+    });
+
+    // Sort patterns by length descending to match longest variables first (e.g., [VAR_EXT] before [VAR])
+    patterns.sort((a, b) => b.length - a.length);
+    combinedVariableRegex = new RegExp(`(${patterns.join('|')})`, 'g');
+}
+
 function parseVariables(content) {
     if (!content) {
-        combinedVariableRegex = null;
-        variablesMap.clear();
         return [];
     }
     const localVariables = [];
@@ -121,21 +137,6 @@ function parseVariables(content) {
         localVariables.push(variable);
     }
 
-    if (localVariables.length > 0) {
-        variablesMap.clear();
-        const patterns = localVariables.map(v => {
-            variablesMap.set(v.raw, v);
-            const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
-            return `\\[${escaped}\\]`;
-        });
-
-        // Sort patterns by length descending to match longest variables first (e.g., [VAR_EXT] before [VAR])
-        patterns.sort((a, b) => b.length - a.length);
-        combinedVariableRegex = new RegExp(`(${patterns.join('|')})`, 'g');
-    } else {
-        variablesMap.clear();
-        combinedVariableRegex = null;
-    }
     return localVariables;
 }
 
@@ -159,6 +160,7 @@ function selectPrompt(prompt, categoryName) {
 
     // Parse variables like [TOPIC], [YOUR NICHE]
     variables = parseVariables(prompt.content);
+    updateGlobalVariableStates(variables);
 
     renderForm();
     updateOutput();
@@ -341,6 +343,7 @@ if (typeof module !== 'undefined' && module.exports) {
         escapeHTML,
         renderSidebar,
         parseVariables,
+        updateGlobalVariableStates,
         selectPrompt,
         renderForm,
         updateOutput,
