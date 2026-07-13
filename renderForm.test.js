@@ -48,7 +48,9 @@ describe('renderForm function', () => {
     });
 
     test('should hide noVariablesMsg and show dynamicForm when variables exist', () => {
-        app.setVariables(app.parseVariables('Hello [NAME]'));
+        const vars = app.parseVariables('Hello [NAME]');
+        app.setVariables(vars);
+        app.updateGlobalVariableStates(vars);
 
         app.renderForm();
 
@@ -57,7 +59,9 @@ describe('renderForm function', () => {
     });
 
     test('should generate correct DOM fields for variables', () => {
-        app.setVariables(app.parseVariables('Hello [NAME:Enter name] and [LOCATION]'));
+        const vars = app.parseVariables('Hello [NAME:Enter name] and [LOCATION]');
+        app.setVariables(vars);
+        app.updateGlobalVariableStates(vars);
 
         app.renderForm();
 
@@ -88,7 +92,10 @@ describe('renderForm function', () => {
     });
 
     test('should cache inputElement on the variable object', () => {
-        const vars = app.setVariables(app.parseVariables('[TEST_VAR]'));
+        const parsed = app.parseVariables('[TEST_VAR]');
+        app.setVariables(parsed);
+        app.updateGlobalVariableStates(parsed);
+        const vars = parsed;
 
         app.renderForm();
 
@@ -112,7 +119,9 @@ describe('renderForm function', () => {
             content: 'Value: [VAL]'
         });
         app.setPromptOutput(document.createElement('div'));
-        app.setVariables(app.parseVariables('Value: [VAL]'));
+        const vars = app.parseVariables('Value: [VAL]');
+        app.setVariables(vars);
+        app.updateGlobalVariableStates(vars);
 
         app.renderForm();
 
