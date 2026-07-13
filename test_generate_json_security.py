@@ -1,5 +1,4 @@
 import unittest
-from pathlib import Path
 from generate_json import parse_prompts
 
 class TestGenerateJsonSecurity(unittest.TestCase):
