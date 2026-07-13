@@ -176,6 +176,8 @@ function renderForm() {
         if (noVariablesMsg) noVariablesMsg.classList.add('hidden');
         dynamicForm.classList.remove('hidden');
 
+        const fragment = document.createDocumentFragment();
+
         variables.forEach(variable => {
             const div = document.createElement('div');
             div.className = 'flex flex-col gap-1';
@@ -198,8 +200,10 @@ function renderForm() {
 
             div.appendChild(label);
             div.appendChild(input);
-            dynamicForm.appendChild(div);
+            fragment.appendChild(div);
         });
+
+        dynamicForm.appendChild(fragment);
     }
 }
 
