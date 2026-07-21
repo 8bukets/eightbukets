@@ -4,6 +4,9 @@ import re
 
 def parse_prompts(data=None, filename='prompts.txt'):
     if data is None:
+        if Path(filename).is_absolute():
+            raise PermissionError(f"Access denied: Path traversal detected for {filename}")
+
         base_dir = Path(__file__).resolve().parent
         filepath = (base_dir / filename).resolve()
 
