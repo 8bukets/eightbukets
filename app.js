@@ -79,7 +79,7 @@ const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VARIABLE_REGEX = /\[(.*?)\]/g;
 
 function parseVariables(content) {
-    if (!content) {
+    if (!content || typeof content !== 'string') {
         combinedVariableRegex = null;
         variablesMap.clear();
         return [];
