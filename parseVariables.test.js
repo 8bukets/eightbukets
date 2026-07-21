@@ -54,6 +54,15 @@ describe('parseVariables function', () => {
         expect(result).toHaveLength(0);
     });
 
+    test('should handle non-string inputs gracefully by returning an empty array', () => {
+        expect(parseVariables(null)).toEqual([]);
+        expect(parseVariables(undefined)).toEqual([]);
+        expect(parseVariables(12345)).toEqual([]);
+        expect(parseVariables({})).toEqual([]);
+        expect(parseVariables([])).toEqual([]);
+        expect(parseVariables(true)).toEqual([]);
+    });
+
     test('should handle complex mixed variables', () => {
         const content = "Prompt: [ACTION: Write] a [FORMAT — Blog Post] about [TOPIC] for [AUDIENCE] which will be a [FORMAT — Blog Post].";
         const result = parseVariables(content);
