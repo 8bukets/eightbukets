@@ -275,8 +275,8 @@ function updateOutput() {
     }
 }
 
-if (typeof document !== 'undefined') {
-document.addEventListener('DOMContentLoaded', async () => {
+// Initialize App
+async function initApp() {
     sidebarContent = document.getElementById('sidebar-content');
     searchInput = document.getElementById('search-input');
     welcomeMessage = document.getElementById('welcome-message');
@@ -333,11 +333,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     }
-});
+}
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', initApp);
 }
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+        initApp,
         escapeHTML,
         renderSidebar,
         parseVariables,
