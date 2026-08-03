@@ -78,6 +78,21 @@ function renderSidebar(categories, filterText = '') {
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VARIABLE_REGEX = /\[(.*?)\]/g;
 
+class PromptVariable {
+    constructor(raw, name, hint) {
+        this.raw = raw;
+        this.name = name;
+        this.hint = hint;
+    }
+    get replaceRegex() {
+        if (!this._replaceRegex) {
+            const escapedVariable = this.raw.replace(ESCAPE_REGEX, '\\$&');
+            this._replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
+        }
+        return this._replaceRegex;
+    }
+}
+
 function parseVariables(content) {
     if (!content) {
         combinedVariableRegex = null;
@@ -110,15 +125,7 @@ function parseVariables(content) {
             varHint = rawVar.substring(separatorIndex + 1).trim();
         }
 
-        const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-
-        const variable = {
-            raw: rawVar,
-            name: varName,
-            hint: varHint,
-            replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
-        };
-        localVariables.push(variable);
+        localVariables.push(new PromptVariable(rawVar, varName, varHint));
     }
 
     if (localVariables.length > 0) {
