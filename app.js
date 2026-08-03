@@ -243,34 +243,39 @@ function updateOutput() {
 
         matches.sort((a, b) => a.start - b.start);
 
-        let htmlOutput = '';
+        const fragment = document.createDocumentFragment();
         let lastIndex = 0;
 
         for (let i = 0; i < matches.length; i++) {
             const { start, end, variable, matchedText } = matches[i];
 
             if (start > lastIndex) {
-                htmlOutput += escapeHTML(finalContent.substring(lastIndex, start));
+                fragment.appendChild(document.createTextNode(finalContent.substring(lastIndex, start)));
             }
 
             const input = variable.inputElement;
             const isFilled = input && input.value.trim() !== '';
 
+            const span = document.createElement('span');
             if (isFilled) {
-                htmlOutput += `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapeHTML(input.value)}</span>`;
+                span.className = 'bg-indigo-100 text-indigo-800 font-medium px-1 rounded';
+                span.textContent = input.value;
             } else {
-                htmlOutput += `<span class="bg-gray-200 text-gray-600 px-1 rounded">${escapeHTML(matchedText)}</span>`;
+                span.className = 'bg-gray-200 text-gray-600 px-1 rounded';
+                span.textContent = matchedText;
             }
+            fragment.appendChild(span);
 
             lastIndex = end;
         }
 
         if (lastIndex < finalContent.length) {
-            htmlOutput += escapeHTML(finalContent.substring(lastIndex));
+            fragment.appendChild(document.createTextNode(finalContent.substring(lastIndex)));
         }
 
         if (promptOutput) {
-            promptOutput.innerHTML = htmlOutput;
+            promptOutput.textContent = '';
+            promptOutput.appendChild(fragment);
         }
     }
 }
