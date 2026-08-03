@@ -306,7 +306,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderSidebar(promptsData);
     } catch (error) {
         console.error('Error loading prompts:', error);
-        if (sidebarContent) sidebarContent.innerHTML = '<p class="text-red-500">Failed to load prompts.</p>';
+        if (sidebarContent) {
+            const errorMsg = document.createElement('p');
+            errorMsg.className = 'text-red-500';
+            errorMsg.textContent = 'Failed to load prompts.';
+            sidebarContent.innerHTML = '';
+            sidebarContent.appendChild(errorMsg);
+        }
     }
 
     // Search functionality
