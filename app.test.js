@@ -459,3 +459,81 @@ describe('renderSidebar', () => {
         expect(promptButtons[2].classList.contains('bg-indigo-100')).toBe(false);
     });
 });
+
+describe('DOMContentLoaded Event Listeners', () => {
+    let originalFetch;
+    let consoleSpy;
+
+    beforeAll(() => {
+        originalFetch = global.fetch;
+    });
+
+    afterAll(() => {
+        global.fetch = originalFetch;
+    });
+
+    beforeEach(() => {
+        const html = fs.readFileSync(require('path').resolve(__dirname, './index.html'), 'utf8');
+        const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
+        document.documentElement.innerHTML = cleanHtml;
+
+        global.fetch = jest.fn();
+        consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        if (consoleSpy) {
+            consoleSpy.mockRestore();
+        }
+        jest.resetModules();
+        document.documentElement.innerHTML = '';
+        jest.clearAllMocks();
+    });
+
+    test('should attach input event listener to searchInput and filter sidebar content', async () => {
+        const mockData = {
+            categories: [
+                {
+                    name: 'Category 1',
+                    prompts: [
+                        { id: '1', title: 'Target Prompt', content: 'Target content' },
+                        { id: '2', title: 'Hidden Prompt', content: 'Hidden content' }
+                    ]
+                }
+            ]
+        };
+
+        const mockResponse = {
+            json: jest.fn().mockResolvedValueOnce(mockData)
+        };
+        global.fetch.mockResolvedValueOnce(mockResponse);
+
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        // Trigger DOMContentLoaded
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        // Wait for fetch to resolve and renderSidebar to be called initially
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick);
+
+        const sidebarContent = document.getElementById('sidebar-content');
+
+        // Ensure initially there are 2 prompts rendered
+        let promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
+        expect(promptButtons.length).toBe(2);
+
+        // Trigger input event on searchInput
+        const searchInput = document.getElementById('search-input');
+        searchInput.value = 'Target';
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+        // Ensure sidebar is filtered
+        promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
+        expect(promptButtons.length).toBe(1);
+        expect(promptButtons[0].textContent).toBe('Target Prompt');
+    });
+});
