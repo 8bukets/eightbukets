@@ -53,7 +53,10 @@ def parse_prompts(data=None, filename='prompts.txt'):
 
     return {"categories": categories}
 
-if __name__ == '__main__':
+def main():
     data = parse_prompts()
     with open('prompts.json', 'w') as f:
         json.dump(data, f, indent=2)
+
+if __name__ == '__main__':
+    main()
