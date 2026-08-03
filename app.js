@@ -5,6 +5,7 @@ let currentPrompt = null;
 let variables = [];
 let combinedVariableRegex = null;
 let variablesMap = new Map();
+let regexCache = new Map();
 
 const HTML_ESCAPE_MAP = {
     '&': '&amp;',
@@ -131,7 +132,15 @@ function parseVariables(content) {
 
         // Sort patterns by length descending to match longest variables first (e.g., [VAR_EXT] before [VAR])
         patterns.sort((a, b) => b.length - a.length);
-        combinedVariableRegex = new RegExp(`(${patterns.join('|')})`, 'g');
+
+        const cacheKey = patterns.join('|');
+        if (regexCache.has(cacheKey)) {
+            combinedVariableRegex = regexCache.get(cacheKey);
+            combinedVariableRegex.lastIndex = 0;
+        } else {
+            combinedVariableRegex = new RegExp(`(${cacheKey})`, 'g');
+            regexCache.set(cacheKey, combinedVariableRegex);
+        }
     } else {
         variablesMap.clear();
         combinedVariableRegex = null;
