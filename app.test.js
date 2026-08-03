@@ -212,6 +212,37 @@ describe('Prompts Library Error Handling', () => {
 
         consoleSpy.mockRestore();
     });
+
+    test('should handle fetch error gracefully when sidebarContent is null', async () => {
+        // Mock fetch to reject with an error
+        const mockError = new Error('Network error');
+        global.fetch.mockRejectedValueOnce(mockError);
+
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        // Remove sidebar-content from DOM
+        const sidebarContent = document.getElementById('sidebar-content');
+        if (sidebarContent) {
+            sidebarContent.remove();
+        }
+
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        await new Promise(process.nextTick);
+
+        expect(global.fetch).toHaveBeenCalledWith('prompts.json');
+        expect(consoleSpy).toHaveBeenCalledWith('Error loading prompts:', mockError);
+
+        // Assert sidebarContent is indeed null and no errors were thrown when trying to set innerHTML
+        expect(document.getElementById('sidebar-content')).toBeNull();
+
+        consoleSpy.mockRestore();
+    });
 });
 
 describe('Clipboard Copy Functionality', () => {
