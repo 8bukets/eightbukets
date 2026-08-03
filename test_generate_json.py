@@ -230,5 +230,19 @@ This is some content. How to Get Maximum Value From This Collection More content
         self.assertIn("File not found:", str(cm.exception))
         self.assertIn("this_file_definitely_does_not_exist_at_all.txt", str(cm.exception))
 
+    @patch('generate_json.json.dump')
+    @patch('generate_json.open', new_callable=mock_open)
+    @patch('generate_json.parse_prompts')
+    def test_main_execution(self, mock_parse_prompts, mock_file_open, mock_json_dump):
+        from generate_json import main
+        mock_data = {"categories": []}
+        mock_parse_prompts.return_value = mock_data
+
+        main()
+
+        mock_parse_prompts.assert_called_once()
+        mock_file_open.assert_called_once_with('prompts.json', 'w')
+        mock_json_dump.assert_called_once_with(mock_data, mock_file_open(), indent=2)
+
 if __name__ == '__main__':
     unittest.main()
