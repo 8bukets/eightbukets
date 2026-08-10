@@ -351,6 +351,80 @@ describe('Clipboard Copy Functionality', () => {
     });
 });
 
+describe('Search Functionality', () => {
+    let originalFetch;
+
+    beforeAll(() => {
+        originalFetch = global.fetch;
+    });
+
+    afterAll(() => {
+        global.fetch = originalFetch;
+    });
+
+    beforeEach(() => {
+        const html = fs.readFileSync(path.resolve(__dirname, './index.html'), 'utf8');
+        const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
+        document.documentElement.innerHTML = cleanHtml;
+
+        // Mock fetch to prevent network errors
+        const mockData = {
+            categories: [
+                {
+                    name: 'Test Category',
+                    prompts: [
+                        { id: '1', title: 'FindMe Prompt', content: 'Hidden text' },
+                        { id: '2', title: 'Another Prompt', content: 'Nothing here' }
+                    ]
+                }
+            ]
+        };
+        global.fetch = jest.fn(() => Promise.resolve({
+            json: () => Promise.resolve(mockData)
+        }));
+    });
+
+    afterEach(() => {
+        jest.resetModules();
+        document.documentElement.innerHTML = '';
+        jest.clearAllMocks();
+    });
+
+    test('should re-render sidebar when search input receives an input event', async () => {
+        // Require app.js
+        let app;
+        jest.isolateModules(() => {
+            app = require('./app.js');
+        });
+
+        // Trigger DOMContentLoaded
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        // Wait for fetch to resolve
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick);
+
+        const searchInput = document.getElementById('search-input');
+        const sidebarContent = document.getElementById('sidebar-content');
+
+        // Verify initial render (should contain both)
+        expect(sidebarContent.innerHTML).toContain('FindMe Prompt');
+        expect(sidebarContent.innerHTML).toContain('Another Prompt');
+
+        // Simulate user typing in search box
+        searchInput.value = 'findme';
+
+        // Dispatch input event to trigger the listener
+        const inputEvent = new Event('input');
+        searchInput.dispatchEvent(inputEvent);
+
+        // Verify the sidebar was updated (should only contain FindMe)
+        expect(sidebarContent.innerHTML).toContain('FindMe Prompt');
+        expect(sidebarContent.innerHTML).not.toContain('Another Prompt');
+    });
+});
+
 describe('renderSidebar', () => {
     let app;
     let sidebarContent;
