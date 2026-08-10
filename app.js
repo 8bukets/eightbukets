@@ -78,10 +78,37 @@ function renderSidebar(categories, filterText = '') {
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VARIABLE_REGEX = /\[(.*?)\]/g;
 
+class PromptVariable {
+    constructor(rawVar, name, hint) {
+        this.raw = rawVar;
+        this.name = name;
+        this.hint = hint;
+    }
+    get replaceRegex() {
+        if (!this._replaceRegex) {
+            const escapedVariable = this.raw.replace(ESCAPE_REGEX, '\\$&');
+            this._replaceRegex = new RegExp(`\\[${escapedVariable}\\]`, 'g');
+        }
+        return this._replaceRegex;
+    }
+}
+
+function extractVariableDetails(rawVar) {
+    let varName = rawVar;
+    let varHint = "";
+    let separatorIndex = rawVar.indexOf('—');
+    if (separatorIndex === -1) {
+        separatorIndex = rawVar.indexOf(':');
+    }
+    if (separatorIndex !== -1) {
+        varName = rawVar.substring(0, separatorIndex).trim();
+        varHint = rawVar.substring(separatorIndex + 1).trim();
+    }
+    return { name: varName, hint: varHint };
+}
+
 function parseVariables(content) {
-    if (!content) {
-        combinedVariableRegex = null;
-        variablesMap.clear();
+    if (typeof content !== 'string' || !content) {
         return [];
     }
     const localVariables = [];
@@ -98,31 +125,17 @@ function parseVariables(content) {
         }
         seenVars.add(rawVar);
 
-        // Split variable name and hint
-        let varName = rawVar;
-        let varHint = "";
-        let separatorIndex = rawVar.indexOf('—');
-        if (separatorIndex === -1) {
-            separatorIndex = rawVar.indexOf(':');
-        }
-        if (separatorIndex !== -1) {
-            varName = rawVar.substring(0, separatorIndex).trim();
-            varHint = rawVar.substring(separatorIndex + 1).trim();
-        }
-
-        const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-
-        const variable = {
-            raw: rawVar,
-            name: varName,
-            hint: varHint,
-            replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
-        };
-        localVariables.push(variable);
+        const { name, hint } = extractVariableDetails(rawVar);
+        localVariables.push(new PromptVariable(rawVar, name, hint));
     }
 
-    if (localVariables.length > 0) {
-        variablesMap.clear();
+    return localVariables;
+}
+
+function updateGlobalVariableStates(localVariables) {
+    variablesMap.clear();
+
+    if (localVariables && localVariables.length > 0) {
         const patterns = localVariables.map(v => {
             variablesMap.set(v.raw, v);
             const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
@@ -133,10 +146,8 @@ function parseVariables(content) {
         patterns.sort((a, b) => b.length - a.length);
         combinedVariableRegex = new RegExp(`(${patterns.join('|')})`, 'g');
     } else {
-        variablesMap.clear();
         combinedVariableRegex = null;
     }
-    return localVariables;
 }
 
 // Select a prompt
@@ -159,6 +170,7 @@ function selectPrompt(prompt, categoryName) {
 
     // Parse variables like [TOPIC], [YOUR NICHE]
     variables = parseVariables(prompt.content);
+    updateGlobalVariableStates(variables);
 
     renderForm();
     updateOutput();
@@ -340,7 +352,10 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         escapeHTML,
         renderSidebar,
+        PromptVariable,
+        extractVariableDetails,
         parseVariables,
+        updateGlobalVariableStates,
         selectPrompt,
         renderForm,
         updateOutput,

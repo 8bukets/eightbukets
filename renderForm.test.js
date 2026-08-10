@@ -112,7 +112,9 @@ describe('renderForm function', () => {
             content: 'Value: [VAL]'
         });
         app.setPromptOutput(document.createElement('div'));
-        app.setVariables(app.parseVariables('Value: [VAL]'));
+        const vars = app.parseVariables('Value: [VAL]');
+        app.updateGlobalVariableStates(vars);
+        app.setVariables(vars);
 
         app.renderForm();
 
@@ -134,7 +136,9 @@ describe('renderForm function', () => {
     });
 
     test('should handle variables with special characters in raw string for ID and for attributes', () => {
-        app.setVariables(app.parseVariables('Hello [NAME: <script>alert(1)</script>]'));
+        const vars = app.parseVariables('Hello [NAME: <script>alert(1)</script>]');
+        app.updateGlobalVariableStates(vars);
+        app.setVariables(vars);
 
         app.renderForm();
 
