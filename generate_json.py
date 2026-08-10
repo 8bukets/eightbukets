@@ -19,6 +19,8 @@ def parse_prompts(data=None, filename='prompts.txt'):
         with open(filepath, 'r', encoding='utf-8') as f:
             data = f.read()
 
+    data = data.replace("How to Get Maximum Value From This Collection", "")
+
     categories = []
 
     # Split by Parts
@@ -29,16 +31,17 @@ def parse_prompts(data=None, filename='prompts.txt'):
 
     for i in range(1, len(parts), 2):
         category_name = parts[i].strip()
-        category_content = parts[i+1].strip()
+        category_content = parts[i+1]
 
         prompts = []
-        # Split by "Prompt X — Title"
-        prompt_blocks = prompt_regex.split(category_content)
-        # first element could be empty or just newline
-        for j in range(1, len(prompt_blocks), 3):
-            pid = int(prompt_blocks[j])
-            title = prompt_blocks[j+1].strip()
-            content = prompt_blocks[j+2].replace("How to Get Maximum Value From This Collection", "").strip()
+        matches = list(prompt_regex.finditer(category_content))
+        for j, match in enumerate(matches):
+            pid = int(match.group(1))
+            title = match.group(2).strip()
+
+            start = match.end()
+            end = matches[j+1].start() if j + 1 < len(matches) else len(category_content)
+            content = category_content[start:end].strip()
 
             prompts.append({
                 "id": pid,
