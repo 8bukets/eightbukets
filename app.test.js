@@ -397,13 +397,13 @@ describe('renderSidebar', () => {
         app.renderSidebar(mockCategories);
 
         // Should render 2 categories
-        const categoryHeaders = sidebarContent.querySelectorAll('h3');
+        const categoryHeaders = Array.from(sidebarContent.querySelectorAll('h3')).filter(h3 => h3.parentElement.style.display !== 'none');
         expect(categoryHeaders.length).toBe(2);
         expect(categoryHeaders[0].textContent).toBe('Category 1');
         expect(categoryHeaders[1].textContent).toBe('Category 2');
 
         // Should render 3 prompts total
-        const promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
+        const promptButtons = Array.from(sidebarContent.querySelectorAll('.prompt-btn')).filter(btn => btn.parentElement.style.display !== 'none');
         expect(promptButtons.length).toBe(3);
         expect(promptButtons[0].textContent).toBe('Prompt 1');
         expect(promptButtons[1].textContent).toBe('Prompt 2');
@@ -413,18 +413,20 @@ describe('renderSidebar', () => {
     test('filters prompts based on text in title or content', () => {
         app.renderSidebar(mockCategories, 'something');
 
-        // Only Category 2 has 'something' in content
-        const categoryHeaders = sidebarContent.querySelectorAll('h3');
-        expect(categoryHeaders.length).toBe(1);
-        expect(categoryHeaders[0].textContent).toBe('Category 2');
+        // Only Category 2 has 'something' in content (Category 1 should be hidden)
+        const visibleCategoryHeaders = Array.from(sidebarContent.querySelectorAll('h3'))
+            .filter(h3 => h3.parentElement.style.display !== 'none');
+        expect(visibleCategoryHeaders.length).toBe(1);
+        expect(visibleCategoryHeaders[0].textContent).toBe('Category 2');
 
-        const promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
-        expect(promptButtons.length).toBe(1);
-        expect(promptButtons[0].textContent).toBe('Another Prompt');
+        const visiblePromptButtons = Array.from(sidebarContent.querySelectorAll('.prompt-btn'))
+            .filter(btn => btn.parentElement.style.display !== 'none');
+        expect(visiblePromptButtons.length).toBe(1);
+        expect(visiblePromptButtons[0].textContent).toBe('Another Prompt');
 
         // Test filtering by title
         app.renderSidebar(mockCategories, 'prompt 1');
-        const promptButtons2 = sidebarContent.querySelectorAll('.prompt-btn');
+        const promptButtons2 = Array.from(sidebarContent.querySelectorAll('.prompt-btn')).filter(btn => btn.parentElement.style.display !== 'none');
         expect(promptButtons2.length).toBe(1);
         expect(promptButtons2[0].textContent).toBe('Prompt 1');
     });

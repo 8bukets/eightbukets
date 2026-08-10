@@ -26,51 +26,82 @@ function escapeHTML(str) {
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
-    sidebarContent.innerHTML = '';
+
+    if (!sidebarContent._isBuilt || sidebarContent._lastCategories !== categories) {
+        sidebarContent.innerHTML = '';
+
+        // Use a DocumentFragment to batch DOM insertions
+        const fragment = document.createDocumentFragment();
+
+        categories.forEach(category => {
+            const categoryDiv = document.createElement('div');
+            categoryDiv.className = 'mb-6';
+            category.element = categoryDiv;
+
+            const categoryHeader = document.createElement('h3');
+            categoryHeader.className = 'text-xs font-bold text-gray-400 uppercase tracking-wider mb-2';
+            categoryHeader.textContent = category.name;
+            categoryDiv.appendChild(categoryHeader);
+
+            const promptList = document.createElement('ul');
+            promptList.className = 'space-y-1';
+
+            category.prompts.forEach(prompt => {
+                const li = document.createElement('li');
+                prompt.element = li;
+
+                const btn = document.createElement('button');
+                btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate';
+
+                btn.textContent = prompt.title;
+                btn.onclick = () => selectPrompt(prompt, category.name);
+
+                prompt.btnElement = btn;
+
+                li.appendChild(btn);
+                promptList.appendChild(li);
+            });
+
+            categoryDiv.appendChild(promptList);
+            fragment.appendChild(categoryDiv);
+        });
+
+        sidebarContent.appendChild(fragment);
+        sidebarContent._isBuilt = true;
+        sidebarContent._lastCategories = categories;
+    }
 
     const filterTextLower = filterText.toLowerCase();
 
     categories.forEach(category => {
-        const filteredPrompts = category.prompts.filter(prompt => {
-            // Strictly use pre-computed lowercase fields to avoid repeated string manipulation
-            // and fallback to empty string if missing to avoid throwing and maintain performance
-            return (prompt.titleLower || '').includes(filterTextLower) || (prompt.contentLower || '').includes(filterTextLower);
-        });
+        let hasVisiblePrompts = false;
 
-        if (filteredPrompts.length === 0) return;
+        category.prompts.forEach(prompt => {
+            const matches = filterTextLower === '' ||
+                (prompt.titleLower || '').includes(filterTextLower) ||
+                (prompt.contentLower || '').includes(filterTextLower);
 
-        const categoryDiv = document.createElement('div');
-        categoryDiv.className = 'mb-6';
-
-        const categoryHeader = document.createElement('h3');
-        categoryHeader.className = 'text-xs font-bold text-gray-400 uppercase tracking-wider mb-2';
-        categoryHeader.textContent = category.name;
-        categoryDiv.appendChild(categoryHeader);
-
-        const promptList = document.createElement('ul');
-        promptList.className = 'space-y-1';
-
-        filteredPrompts.forEach(prompt => {
-            const li = document.createElement('li');
-            const btn = document.createElement('button');
-            btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate';
-
-            // Add highlighting if this is the currently selected prompt
-            if (currentPrompt && currentPrompt.id === prompt.id) {
-                btn.classList.add('bg-indigo-100', 'text-indigo-800', 'font-semibold');
+            if (matches) {
+                prompt.element.style.display = '';
+                hasVisiblePrompts = true;
             } else {
-                btn.classList.add('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+                prompt.element.style.display = 'none';
             }
 
-            btn.textContent = prompt.title;
-            btn.onclick = () => selectPrompt(prompt, category.name);
-
-            li.appendChild(btn);
-            promptList.appendChild(li);
+            if (currentPrompt && currentPrompt.id === prompt.id) {
+                prompt.btnElement.classList.add('bg-indigo-100', 'text-indigo-800', 'font-semibold');
+                prompt.btnElement.classList.remove('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+            } else {
+                prompt.btnElement.classList.remove('bg-indigo-100', 'text-indigo-800', 'font-semibold');
+                prompt.btnElement.classList.add('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+            }
         });
 
-        categoryDiv.appendChild(promptList);
-        sidebarContent.appendChild(categoryDiv);
+        if (hasVisiblePrompts) {
+            category.element.style.display = '';
+        } else {
+            category.element.style.display = 'none';
+        }
     });
 }
 
