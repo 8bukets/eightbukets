@@ -203,7 +203,73 @@ function renderForm() {
     }
 }
 
-// Update Textarea Output
+function updateTextareaOutput(content) {
+    // Single pass replacement for textarea using pre-computed variablesMap
+    promptOutput.value = content.replace(VARIABLE_REGEX, (match, raw) => {
+        const v = variablesMap.get(raw);
+        if (v) {
+            return (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
+        }
+        return match;
+    });
+}
+
+function updateHtmlOutput(content) {
+    const matches = [];
+    let match;
+    const finalContent = content; // ReferenceError fix
+
+    if (combinedVariableRegex) {
+        combinedVariableRegex.lastIndex = 0;
+        while ((match = combinedVariableRegex.exec(finalContent)) !== null) {
+            const matchedText = match[0];
+            const rawVar = matchedText.slice(1, -1);
+            const variable = variablesMap.get(rawVar);
+            if (variable) {
+                matches.push({
+                    start: match.index,
+                    end: match.index + matchedText.length,
+                    variable,
+                    matchedText
+                });
+            }
+        }
+    }
+
+    matches.sort((a, b) => a.start - b.start);
+
+    let htmlOutput = '';
+    let lastIndex = 0;
+
+    for (let i = 0; i < matches.length; i++) {
+        const { start, end, variable, matchedText } = matches[i];
+
+        if (start > lastIndex) {
+            htmlOutput += escapeHTML(finalContent.substring(lastIndex, start));
+        }
+
+        const input = variable.inputElement;
+        const isFilled = input && input.value.trim() !== '';
+
+        if (isFilled) {
+            htmlOutput += `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapeHTML(input.value)}</span>`;
+        } else {
+            htmlOutput += `<span class="bg-gray-200 text-gray-600 px-1 rounded">${escapeHTML(matchedText)}</span>`;
+        }
+
+        lastIndex = end;
+    }
+
+    if (lastIndex < finalContent.length) {
+        htmlOutput += escapeHTML(finalContent.substring(lastIndex));
+    }
+
+    if (promptOutput) {
+        promptOutput.innerHTML = htmlOutput;
+    }
+}
+
+// Update Output
 function updateOutput() {
     if (!currentPrompt || !promptOutput) return;
 
@@ -211,67 +277,9 @@ function updateOutput() {
     const isTextarea = promptOutput.tagName === 'TEXTAREA' || promptOutput.nodeName === 'TEXTAREA';
 
     if (isTextarea) {
-        // Single pass replacement for textarea using pre-computed variablesMap
-        promptOutput.value = content.replace(VARIABLE_REGEX, (match, raw) => {
-            const v = variablesMap.get(raw);
-            if (v) {
-                return (v.inputElement && v.inputElement.value.trim() !== '') ? v.inputElement.value : `[${v.raw}]`;
-            }
-            return match;
-        });
+        updateTextareaOutput(content);
     } else {
-        const matches = [];
-        let match;
-        const finalContent = content; // ReferenceError fix
-
-        if (combinedVariableRegex) {
-            combinedVariableRegex.lastIndex = 0;
-            while ((match = combinedVariableRegex.exec(finalContent)) !== null) {
-                const matchedText = match[0];
-                const rawVar = matchedText.slice(1, -1);
-                const variable = variablesMap.get(rawVar);
-                if (variable) {
-                    matches.push({
-                        start: match.index,
-                        end: match.index + matchedText.length,
-                        variable,
-                        matchedText
-                    });
-                }
-            }
-        }
-
-        matches.sort((a, b) => a.start - b.start);
-
-        let htmlOutput = '';
-        let lastIndex = 0;
-
-        for (let i = 0; i < matches.length; i++) {
-            const { start, end, variable, matchedText } = matches[i];
-
-            if (start > lastIndex) {
-                htmlOutput += escapeHTML(finalContent.substring(lastIndex, start));
-            }
-
-            const input = variable.inputElement;
-            const isFilled = input && input.value.trim() !== '';
-
-            if (isFilled) {
-                htmlOutput += `<span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">${escapeHTML(input.value)}</span>`;
-            } else {
-                htmlOutput += `<span class="bg-gray-200 text-gray-600 px-1 rounded">${escapeHTML(matchedText)}</span>`;
-            }
-
-            lastIndex = end;
-        }
-
-        if (lastIndex < finalContent.length) {
-            htmlOutput += escapeHTML(finalContent.substring(lastIndex));
-        }
-
-        if (promptOutput) {
-            promptOutput.innerHTML = htmlOutput;
-        }
+        updateHtmlOutput(content);
     }
 }
 
@@ -355,7 +363,9 @@ if (typeof module !== 'undefined' && module.exports) {
         setPromptTitle: (el) => promptTitle = el,
         setPromptCategory: (el) => promptCategory = el,
         setPromptWorkspace: (el) => promptWorkspace = el,
-            setWelcomeMessage: (el) => welcomeMessage = el,
-            setVariables: (vars) => variables = vars
+        setWelcomeMessage: (el) => welcomeMessage = el,
+        setVariables: (vars) => variables = vars,
+        updateTextareaOutput,
+        updateHtmlOutput
     };
 }
