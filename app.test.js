@@ -459,3 +459,58 @@ describe('renderSidebar', () => {
         expect(promptButtons[2].classList.contains('bg-indigo-100')).toBe(false);
     });
 });
+
+
+describe('Search Input Event Listener', () => {
+    let mockCategories;
+
+    beforeEach(() => {
+        const html = fs.readFileSync(path.resolve(__dirname, './index.html'), 'utf8');
+        const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
+        document.documentElement.innerHTML = cleanHtml;
+
+        mockCategories = [
+            {
+                name: 'Category 1',
+                prompts: [
+                    { id: '1', title: 'Prompt 1', content: 'Content 1', titleLower: 'prompt 1', contentLower: 'content 1' },
+                    { id: '2', title: 'Prompt 2', content: 'Content 2', titleLower: 'prompt 2', contentLower: 'content 2' }
+                ]
+            }
+        ];
+
+        global.fetch = jest.fn(() => Promise.resolve({
+            json: () => Promise.resolve({ categories: mockCategories })
+        }));
+    });
+
+    afterEach(() => {
+        jest.resetModules();
+        document.documentElement.innerHTML = '';
+        jest.clearAllMocks();
+    });
+
+    test('should filter sidebar items when input event is triggered', async () => {
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick); // wait for fetch and rendering
+
+        const sidebarContent = document.getElementById('sidebar-content');
+        const searchInput = document.getElementById('search-input');
+
+        expect(sidebarContent.innerHTML).toContain('Prompt 1');
+        expect(sidebarContent.innerHTML).toContain('Prompt 2');
+
+        searchInput.value = 'Prompt 1';
+        searchInput.dispatchEvent(new Event('input'));
+
+        expect(sidebarContent.innerHTML).toContain('Prompt 1');
+        expect(sidebarContent.innerHTML).not.toContain('Prompt 2');
+    });
+});
