@@ -78,10 +78,40 @@ function renderSidebar(categories, filterText = '') {
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VARIABLE_REGEX = /\[(.*?)\]/g;
 
-function parseVariables(content) {
-    if (!content) {
+function extractVariableDetails(rawVar) {
+    let varName = rawVar;
+    let varHint = "";
+    let separatorIndex = rawVar.indexOf('—');
+    if (separatorIndex === -1) {
+        separatorIndex = rawVar.indexOf(':');
+    }
+    if (separatorIndex !== -1) {
+        varName = rawVar.substring(0, separatorIndex).trim();
+        varHint = rawVar.substring(separatorIndex + 1).trim();
+    }
+    return { name: varName, hint: varHint };
+}
+
+function updateGlobalVariableStates(localVariables) {
+    variablesMap.clear();
+    if (localVariables.length > 0) {
+        const patterns = localVariables.map(v => {
+            variablesMap.set(v.raw, v);
+            const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
+            return `\\[${escaped}\\]`;
+        });
+
+        // Sort patterns by length descending to match longest variables first (e.g., [VAR_EXT] before [VAR])
+        patterns.sort((a, b) => b.length - a.length);
+        combinedVariableRegex = new RegExp(`(${patterns.join('|')})`, 'g');
+    } else {
         combinedVariableRegex = null;
-        variablesMap.clear();
+    }
+}
+
+function parseVariables(content) {
+    if (typeof content !== 'string' || !content) {
+        updateGlobalVariableStates([]);
         return [];
     }
     const localVariables = [];
@@ -98,44 +128,19 @@ function parseVariables(content) {
         }
         seenVars.add(rawVar);
 
-        // Split variable name and hint
-        let varName = rawVar;
-        let varHint = "";
-        let separatorIndex = rawVar.indexOf('—');
-        if (separatorIndex === -1) {
-            separatorIndex = rawVar.indexOf(':');
-        }
-        if (separatorIndex !== -1) {
-            varName = rawVar.substring(0, separatorIndex).trim();
-            varHint = rawVar.substring(separatorIndex + 1).trim();
-        }
-
+        const { name, hint } = extractVariableDetails(rawVar);
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
 
         const variable = {
             raw: rawVar,
-            name: varName,
-            hint: varHint,
+            name: name,
+            hint: hint,
             replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
         };
         localVariables.push(variable);
     }
 
-    if (localVariables.length > 0) {
-        variablesMap.clear();
-        const patterns = localVariables.map(v => {
-            variablesMap.set(v.raw, v);
-            const escaped = v.raw.replace(ESCAPE_REGEX, '\\$&');
-            return `\\[${escaped}\\]`;
-        });
-
-        // Sort patterns by length descending to match longest variables first (e.g., [VAR_EXT] before [VAR])
-        patterns.sort((a, b) => b.length - a.length);
-        combinedVariableRegex = new RegExp(`(${patterns.join('|')})`, 'g');
-    } else {
-        variablesMap.clear();
-        combinedVariableRegex = null;
-    }
+    updateGlobalVariableStates(localVariables);
     return localVariables;
 }
 
@@ -340,6 +345,8 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         escapeHTML,
         renderSidebar,
+        extractVariableDetails,
+        updateGlobalVariableStates,
         parseVariables,
         selectPrompt,
         renderForm,
