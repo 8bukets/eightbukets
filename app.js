@@ -222,11 +222,10 @@ function updateOutput() {
     } else {
         const matches = [];
         let match;
-        const finalContent = content; // ReferenceError fix
 
         if (combinedVariableRegex) {
             combinedVariableRegex.lastIndex = 0;
-            while ((match = combinedVariableRegex.exec(finalContent)) !== null) {
+            while ((match = combinedVariableRegex.exec(content)) !== null) {
                 const matchedText = match[0];
                 const rawVar = matchedText.slice(1, -1);
                 const variable = variablesMap.get(rawVar);
@@ -250,7 +249,7 @@ function updateOutput() {
             const { start, end, variable, matchedText } = matches[i];
 
             if (start > lastIndex) {
-                htmlOutput += escapeHTML(finalContent.substring(lastIndex, start));
+                htmlOutput += escapeHTML(content.substring(lastIndex, start));
             }
 
             const input = variable.inputElement;
@@ -265,8 +264,8 @@ function updateOutput() {
             lastIndex = end;
         }
 
-        if (lastIndex < finalContent.length) {
-            htmlOutput += escapeHTML(finalContent.substring(lastIndex));
+        if (lastIndex < content.length) {
+            htmlOutput += escapeHTML(content.substring(lastIndex));
         }
 
         if (promptOutput) {
