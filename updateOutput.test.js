@@ -193,4 +193,44 @@ describe('updateOutput function', () => {
 
         expect(promptOutput.innerHTML).toContain('Replace <span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">Short</span> and <span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">Longer</span>.');
     });
+
+    test('should output text safely when combinedVariableRegex is null (no variables in prompt)', () => {
+        const promptOutput = document.createElement('div');
+        app.setPromptOutput(promptOutput);
+
+        app.setCurrentPrompt({
+            id: 'test-7',
+            title: 'No Variables',
+            content: 'Hello World! No variables here.'
+        });
+
+        const dynamicForm = document.getElementById('dynamic-form');
+        app.setDynamicForm(dynamicForm);
+
+        app.selectPrompt(app.getCurrentPrompt(), 'Category');
+
+        app.updateOutput();
+
+        expect(promptOutput.innerHTML).toBe('Hello World! No variables here.');
+    });
+
+    test('should escape output text safely when combinedVariableRegex is null', () => {
+        const promptOutput = document.createElement('div');
+        app.setPromptOutput(promptOutput);
+
+        app.setCurrentPrompt({
+            id: 'test-8',
+            title: 'No Variables with XSS',
+            content: 'Hello World! <script>alert("xss")</script>'
+        });
+
+        const dynamicForm = document.getElementById('dynamic-form');
+        app.setDynamicForm(dynamicForm);
+
+        app.selectPrompt(app.getCurrentPrompt(), 'Category');
+
+        app.updateOutput();
+
+        expect(promptOutput.innerHTML).toBe('Hello World! &lt;script&gt;alert("xss")&lt;/script&gt;');
+    });
 });
