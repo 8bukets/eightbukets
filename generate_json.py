@@ -29,22 +29,32 @@ def parse_prompts(data=None, filename='prompts.txt'):
 
     for i in range(1, len(parts), 2):
         category_name = parts[i].strip()
-        category_content = parts[i+1].strip()
-
+        category_content = parts[i+1] # avoid stripping entire content block to save string copy
         prompts = []
-        # Split by "Prompt X — Title"
-        prompt_blocks = prompt_regex.split(category_content)
-        # first element could be empty or just newline
-        for j in range(1, len(prompt_blocks), 3):
-            pid = int(prompt_blocks[j])
-            title = prompt_blocks[j+1].strip()
-            content = prompt_blocks[j+2].replace("How to Get Maximum Value From This Collection", "").strip()
 
+        iterator = prompt_regex.finditer(category_content)
+
+        try:
+            current_match = next(iterator)
+        except StopIteration:
+            categories.append({"name": category_name, "prompts": prompts})
+            continue
+
+        for next_match in iterator:
+            content = category_content[current_match.end():next_match.start()]
             prompts.append({
-                "id": pid,
-                "title": title,
-                "content": content
+                "id": int(current_match.group(1)),
+                "title": current_match.group(2).strip(),
+                "content": content.replace("How to Get Maximum Value From This Collection", "").strip()
             })
+            current_match = next_match
+
+        content = category_content[current_match.end():]
+        prompts.append({
+            "id": int(current_match.group(1)),
+            "title": current_match.group(2).strip(),
+            "content": content.replace("How to Get Maximum Value From This Collection", "").strip()
+        })
 
         categories.append({
             "name": category_name,
