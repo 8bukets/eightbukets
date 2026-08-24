@@ -214,6 +214,75 @@ describe('Prompts Library Error Handling', () => {
     });
 });
 
+describe('Search Functionality', () => {
+    let originalFetch;
+
+    beforeAll(() => {
+        originalFetch = global.fetch;
+    });
+
+    afterAll(() => {
+        global.fetch = originalFetch;
+    });
+
+    beforeEach(() => {
+        const html = fs.readFileSync(path.resolve(__dirname, './index.html'), 'utf8');
+        const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
+        document.documentElement.innerHTML = cleanHtml;
+        global.fetch = jest.fn();
+    });
+
+    afterEach(() => {
+        jest.resetModules();
+        document.documentElement.innerHTML = '';
+    });
+
+    test('should trigger renderSidebar with correct value on search input', async () => {
+        const mockData = {
+            categories: [
+                {
+                    name: 'Test Category',
+                    prompts: [
+                        { id: '1', title: 'Test Prompt', content: 'Test Content', titleLower: 'test prompt', contentLower: 'test content' },
+                        { id: '2', title: 'Other Prompt', content: 'Other Content', titleLower: 'other prompt', contentLower: 'other content' }
+                    ]
+                }
+            ]
+        };
+
+        const mockResponse = {
+            json: jest.fn().mockResolvedValueOnce(mockData)
+        };
+        global.fetch.mockResolvedValueOnce(mockResponse);
+
+        let app;
+        jest.isolateModules(() => {
+            app = require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick);
+
+        const searchInput = document.getElementById('search-input');
+        const sidebarContent = document.getElementById('sidebar-content');
+
+        let prompts = sidebarContent.querySelectorAll('button');
+        expect(prompts.length).toBe(2);
+
+        // Simulate typing something that matches only one
+        searchInput.value = 'test prompt';
+        const inputEvent = new Event('input');
+        searchInput.dispatchEvent(inputEvent);
+
+        prompts = sidebarContent.querySelectorAll('button');
+        expect(prompts.length).toBe(1);
+        expect(prompts[0].textContent).toBe('Test Prompt');
+    });
+});
+
 describe('Clipboard Copy Functionality', () => {
     let originalClipboard;
 
