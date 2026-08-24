@@ -385,6 +385,7 @@ describe('renderSidebar', () => {
         });
 
         app.setSidebarContent(sidebarContent);
+        if (app.resetLastRenderedCategories) app.resetLastRenderedCategories();
     });
 
     afterEach(() => {
@@ -414,19 +415,21 @@ describe('renderSidebar', () => {
         app.renderSidebar(mockCategories, 'something');
 
         // Only Category 2 has 'something' in content
-        const categoryHeaders = sidebarContent.querySelectorAll('h3');
-        expect(categoryHeaders.length).toBe(1);
-        expect(categoryHeaders[0].textContent).toBe('Category 2');
+        const categoryDivs = sidebarContent.children;
+        const visibleCategories = Array.from(categoryDivs).filter(div => div.style.display !== 'none');
+        expect(visibleCategories.length).toBe(1);
+        expect(visibleCategories[0].querySelector('h3').textContent).toBe('Category 2');
 
-        const promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
-        expect(promptButtons.length).toBe(1);
-        expect(promptButtons[0].textContent).toBe('Another Prompt');
+        const promptItems = sidebarContent.querySelectorAll('li');
+        const visiblePrompts = Array.from(promptItems).filter(li => li.style.display !== 'none');
+        expect(visiblePrompts.length).toBe(1);
+        expect(visiblePrompts[0].querySelector('.prompt-btn').textContent).toBe('Another Prompt');
 
         // Test filtering by title
         app.renderSidebar(mockCategories, 'prompt 1');
-        const promptButtons2 = sidebarContent.querySelectorAll('.prompt-btn');
-        expect(promptButtons2.length).toBe(1);
-        expect(promptButtons2[0].textContent).toBe('Prompt 1');
+        const visiblePrompts2 = Array.from(sidebarContent.querySelectorAll('li')).filter(li => li.style.display !== 'none');
+        expect(visiblePrompts2.length).toBe(1);
+        expect(visiblePrompts2[0].querySelector('.prompt-btn').textContent).toBe('Prompt 1');
     });
 
     test('does not throw when sidebarContent is null', () => {
