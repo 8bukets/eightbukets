@@ -23,55 +23,94 @@ function escapeHTML(str) {
 }
 
 
+let lastRenderedCategories = null;
+
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
-    sidebarContent.innerHTML = '';
 
     const filterTextLower = filterText.toLowerCase();
 
-    categories.forEach(category => {
-        const filteredPrompts = category.prompts.filter(prompt => {
-            // Strictly use pre-computed lowercase fields to avoid repeated string manipulation
-            // and fallback to empty string if missing to avoid throwing and maintain performance
-            return (prompt.titleLower || '').includes(filterTextLower) || (prompt.contentLower || '').includes(filterTextLower);
+    if (lastRenderedCategories !== categories || sidebarContent.children.length === 0) {
+        sidebarContent.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+
+        categories.forEach(category => {
+            const categoryDiv = document.createElement('div');
+            categoryDiv.className = 'mb-6';
+
+            const categoryHeader = document.createElement('h3');
+            categoryHeader.className = 'text-xs font-bold text-gray-400 uppercase tracking-wider mb-2';
+            categoryHeader.textContent = category.name;
+            categoryDiv.appendChild(categoryHeader);
+
+            const promptList = document.createElement('ul');
+            promptList.className = 'space-y-1';
+
+            category.prompts.forEach(prompt => {
+                const li = document.createElement('li');
+                li._promptData = prompt; // Cache prompt data on the element for fast filtering
+
+                const btn = document.createElement('button');
+                btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate';
+
+                // Add highlighting if this is the currently selected prompt
+                if (currentPrompt && currentPrompt.id === prompt.id) {
+                    btn.classList.add('bg-indigo-100', 'text-indigo-800', 'font-semibold');
+                } else {
+                    btn.classList.add('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+                }
+
+                btn.textContent = prompt.title;
+                btn.onclick = () => selectPrompt(prompt, category.name);
+
+                li.appendChild(btn);
+                promptList.appendChild(li);
+            });
+
+            categoryDiv.appendChild(promptList);
+            fragment.appendChild(categoryDiv);
         });
 
-        if (filteredPrompts.length === 0) return;
+        sidebarContent.appendChild(fragment);
+        lastRenderedCategories = categories;
+    }
 
-        const categoryDiv = document.createElement('div');
-        categoryDiv.className = 'mb-6';
+    // Apply filtering and highlighting by toggling visibility and classes on existing DOM nodes
+    const categoryDivs = sidebarContent.children;
+    for (let i = 0; i < categoryDivs.length; i++) {
+        const categoryDiv = categoryDivs[i];
+        const promptList = categoryDiv.querySelector('ul');
+        const listItems = promptList.children;
+        let visibleCount = 0;
 
-        const categoryHeader = document.createElement('h3');
-        categoryHeader.className = 'text-xs font-bold text-gray-400 uppercase tracking-wider mb-2';
-        categoryHeader.textContent = category.name;
-        categoryDiv.appendChild(categoryHeader);
+        for (let j = 0; j < listItems.length; j++) {
+            const li = listItems[j];
+            const prompt = li._promptData;
+            const btn = li.querySelector('button');
 
-        const promptList = document.createElement('ul');
-        promptList.className = 'space-y-1';
+            // Fast property access and fallback, strictly matching original logic
+            const isMatch = (prompt.titleLower || '').includes(filterTextLower) ||
+                            (prompt.contentLower || '').includes(filterTextLower);
 
-        filteredPrompts.forEach(prompt => {
-            const li = document.createElement('li');
-            const btn = document.createElement('button');
-            btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate';
-
-            // Add highlighting if this is the currently selected prompt
-            if (currentPrompt && currentPrompt.id === prompt.id) {
-                btn.classList.add('bg-indigo-100', 'text-indigo-800', 'font-semibold');
+            if (isMatch) {
+                li.style.display = '';
+                visibleCount++;
             } else {
-                btn.classList.add('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+                li.style.display = 'none';
             }
 
-            btn.textContent = prompt.title;
-            btn.onclick = () => selectPrompt(prompt, category.name);
+            // Fast highlighting update
+            if (currentPrompt && currentPrompt.id === prompt.id) {
+                btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate bg-indigo-100 text-indigo-800 font-semibold';
+            } else {
+                btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate text-gray-700 hover:bg-indigo-50 hover:text-indigo-700';
+            }
+        }
 
-            li.appendChild(btn);
-            promptList.appendChild(li);
-        });
-
-        categoryDiv.appendChild(promptList);
-        sidebarContent.appendChild(categoryDiv);
-    });
+        // Hide the entire category if no prompts match
+        categoryDiv.style.display = visibleCount > 0 ? '' : 'none';
+    }
 }
 
 // Pre-compile RegExp to avoid recreation inside loops
