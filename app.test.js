@@ -459,3 +459,76 @@ describe('renderSidebar', () => {
         expect(promptButtons[2].classList.contains('bg-indigo-100')).toBe(false);
     });
 });
+
+describe('Search Input Event Listener', () => {
+    let originalFetch;
+
+    beforeAll(() => {
+        originalFetch = global.fetch;
+    });
+
+    afterAll(() => {
+        global.fetch = originalFetch;
+    });
+
+    beforeEach(() => {
+        const html = require('fs').readFileSync(require('path').resolve(__dirname, './index.html'), 'utf8');
+        const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
+        document.documentElement.innerHTML = cleanHtml;
+        global.fetch = jest.fn();
+    });
+
+    afterEach(() => {
+        jest.resetModules();
+        document.documentElement.innerHTML = '';
+        jest.clearAllMocks();
+    });
+
+    test('should filter sidebar categories and prompts on search input event', async () => {
+        const mockData = {
+            categories: [
+                {
+                    name: 'Category 1',
+                    prompts: [
+                        { id: '1', title: 'Target Prompt', content: 'Target Content' },
+                        { id: '2', title: 'Other Prompt', content: 'Other Content' }
+                    ]
+                }
+            ]
+        };
+
+        const mockResponse = {
+            json: jest.fn().mockResolvedValueOnce(mockData)
+        };
+        global.fetch.mockResolvedValueOnce(mockResponse);
+
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        await new Promise(process.nextTick);
+        await new Promise(process.nextTick);
+
+        const searchInput = document.getElementById('search-input');
+        const sidebarContent = document.getElementById('sidebar-content');
+
+        expect(sidebarContent.innerHTML).toContain('Other Prompt');
+
+        // Dispatch input event
+        searchInput.value = 'Target';
+        searchInput.dispatchEvent(new Event('input'));
+
+        await new Promise(process.nextTick);
+
+        // The renderSidebar logic uses inline styles (display: none) for filtering
+        // Let's check the display style of the prompt buttons
+        const promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
+        let visibleButtons = Array.from(promptButtons).filter(btn => btn.style.display !== 'none');
+
+        expect(visibleButtons.length).toBe(1);
+        expect(visibleButtons[0].textContent).toBe('Target Prompt');
+    });
+});
