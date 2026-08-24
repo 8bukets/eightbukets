@@ -193,4 +193,26 @@ describe('updateOutput function', () => {
 
         expect(promptOutput.innerHTML).toContain('Replace <span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">Short</span> and <span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">Longer</span>.');
     });
+
+    test('should bypass regex match loop when combinedVariableRegex is null', () => {
+        const promptOutput = document.createElement('div');
+        app.setPromptOutput(promptOutput);
+
+        app.setCurrentPrompt({
+            id: 'test-7',
+            title: 'Test Null Regex',
+            content: 'Hello no variables. <script>alert(1)</script>'
+        });
+
+        // Need to parseVariables to set combinedVariableRegex to null
+        app.parseVariables(app.getCurrentPrompt().content);
+
+        // Ensure combinedVariableRegex is null for the test
+        // It's tested indirectly by making sure updateOutput handles the content correctly
+
+        app.updateOutput();
+
+        // The exact content should be output and escaped correctly
+        expect(promptOutput.innerHTML).toBe('Hello no variables. &lt;script&gt;alert(1)&lt;/script&gt;');
+    });
 });
