@@ -1,4 +1,4 @@
-const { updateOutput, setPromptOutput, setCurrentPrompt, parseVariables } = require('./app.js');
+const { updateOutput, setPromptOutput, setCurrentPrompt, parseVariables, updateGlobalVariableStates } = require('./app.js');
 const { performance } = require('perf_hooks');
 
 const content = "This is a [TEST] prompt with [MULTIPLE] variables. [TEST] appears again, and [MULTIPLE] is used twice. Also [ONE_MORE] to make it more complex.";
@@ -19,6 +19,7 @@ const prompt = {
 };
 setCurrentPrompt(prompt);
 const variables = parseVariables(content);
+updateGlobalVariableStates(variables);
 
 // Mock input elements
 variables.forEach(v => {
