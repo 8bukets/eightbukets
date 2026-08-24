@@ -112,7 +112,9 @@ describe('renderForm function', () => {
             content: 'Value: [VAL]'
         });
         app.setPromptOutput(document.createElement('div'));
-        app.setVariables(app.parseVariables('Value: [VAL]'));
+        const vars1 = app.parseVariables('Value: [VAL]');
+        app.updateGlobalVariableStates(vars1);
+        app.setVariables(vars1);
 
         app.renderForm();
 
