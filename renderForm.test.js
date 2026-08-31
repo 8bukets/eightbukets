@@ -38,7 +38,9 @@ describe('renderForm function', () => {
 
     test('should show noVariablesMsg and hide dynamicForm when variables are empty', () => {
         // Clear variables by parsing content with no variables
-        app.setVariables(app.parseVariables('No variables here'));
+        const vars = app.parseVariables('No variables here');
+        app.setVariables(vars);
+        app.updateGlobalVariableStates(vars);
 
         app.renderForm();
 
@@ -48,7 +50,9 @@ describe('renderForm function', () => {
     });
 
     test('should hide noVariablesMsg and show dynamicForm when variables exist', () => {
-        app.setVariables(app.parseVariables('Hello [NAME]'));
+        const vars = app.parseVariables('Hello [NAME]');
+        app.setVariables(vars);
+        app.updateGlobalVariableStates(vars);
 
         app.renderForm();
 
@@ -57,7 +61,9 @@ describe('renderForm function', () => {
     });
 
     test('should generate correct DOM fields for variables', () => {
-        app.setVariables(app.parseVariables('Hello [NAME:Enter name] and [LOCATION]'));
+        const vars = app.parseVariables('Hello [NAME:Enter name] and [LOCATION]');
+        app.setVariables(vars);
+        app.updateGlobalVariableStates(vars);
 
         app.renderForm();
 
@@ -88,7 +94,9 @@ describe('renderForm function', () => {
     });
 
     test('should cache inputElement on the variable object', () => {
-        const vars = app.setVariables(app.parseVariables('[TEST_VAR]'));
+        const vars = app.parseVariables('[TEST_VAR]');
+        app.setVariables(vars);
+        app.updateGlobalVariableStates(vars);
 
         app.renderForm();
 
@@ -112,7 +120,9 @@ describe('renderForm function', () => {
             content: 'Value: [VAL]'
         });
         app.setPromptOutput(document.createElement('div'));
-        app.setVariables(app.parseVariables('Value: [VAL]'));
+        const vars = app.parseVariables('Value: [VAL]');
+        app.setVariables(vars);
+        app.updateGlobalVariableStates(vars);
 
         app.renderForm();
 
@@ -134,7 +144,9 @@ describe('renderForm function', () => {
     });
 
     test('should handle variables with special characters in raw string for ID and for attributes', () => {
-        app.setVariables(app.parseVariables('Hello [NAME: <script>alert(1)</script>]'));
+        const vars = app.parseVariables('Hello [NAME: <script>alert(1)</script>]');
+        app.setVariables(vars);
+        app.updateGlobalVariableStates(vars);
 
         app.renderForm();
 
@@ -148,7 +160,9 @@ describe('renderForm function', () => {
 
     test('should function correctly when noVariablesMsg is null', () => {
         app.setNoVariablesMsg(null);
-        app.setVariables(app.parseVariables('No variables'));
+        const vars = app.parseVariables('No variables');
+        app.setVariables(vars);
+        app.updateGlobalVariableStates(vars);
 
         // Should not throw
         app.renderForm();
@@ -157,7 +171,9 @@ describe('renderForm function', () => {
     });
 
     test('should correctly set placeholder when hint is present or absent', () => {
-        app.setVariables(app.parseVariables('[VAR_WITH_HINT: My hint] and [VAR_NO_HINT]'));
+        const vars = app.parseVariables('[VAR_WITH_HINT: My hint] and [VAR_NO_HINT]');
+        app.setVariables(vars);
+        app.updateGlobalVariableStates(vars);
 
         app.renderForm();
 
