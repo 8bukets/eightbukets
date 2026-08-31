@@ -1,19 +1,26 @@
 const { parseVariables } = require('./app.js');
 
+const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
+
+function getReplaceRegex(rawVar) {
+    const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
+    return new RegExp(`\\[${escapedVariable}\\]`, 'g');
+}
+
 describe('parseVariables function', () => {
     test('should extract a basic variable without hint', () => {
         const result = parseVariables("This is a [TOPIC] prompt.");
         expect(result[0]).toMatchObject(
             { raw: 'TOPIC', name: 'TOPIC', hint: '' }
         );
-        expect("This is a [TOPIC] prompt.".replace(result[0].replaceRegex, 'fun')).toBe("This is a fun prompt.");
+        expect("This is a [TOPIC] prompt.".replace(getReplaceRegex(result[0].raw), 'fun')).toBe("This is a fun prompt.");
     });
 
     test('should extract multiple basic variables', () => {
         const result = parseVariables("A [TOPIC] for [AUDIENCE].");
         expect(result[0]).toMatchObject({ raw: 'TOPIC', name: 'TOPIC', hint: '' });
         expect(result[1]).toMatchObject({ raw: 'AUDIENCE', name: 'AUDIENCE', hint: '' });
-        expect("A [TOPIC] for [AUDIENCE].".replace(result[0].replaceRegex, 'fun').replace(result[1].replaceRegex, 'devs')).toBe("A fun for devs.");
+        expect("A [TOPIC] for [AUDIENCE].".replace(getReplaceRegex(result[0].raw), 'fun').replace(getReplaceRegex(result[1].raw), 'devs')).toBe("A fun for devs.");
     });
 
     test('should deduplicate identical variables', () => {
@@ -22,7 +29,7 @@ describe('parseVariables function', () => {
         expect(result[0]).toMatchObject(
             { raw: 'TOPIC', name: 'TOPIC', hint: '' }
         );
-        expect("A [TOPIC] prompt about the same [TOPIC].".replace(result[0].replaceRegex, 'JS')).toBe("A JS prompt about the same JS.");
+        expect("A [TOPIC] prompt about the same [TOPIC].".replace(getReplaceRegex(result[0].raw), 'JS')).toBe("A JS prompt about the same JS.");
     });
 
     test('should extract variable name and hint separated by colon', () => {
@@ -30,7 +37,7 @@ describe('parseVariables function', () => {
         expect(result[0]).toMatchObject(
             { raw: 'TOPIC: Data Science', name: 'TOPIC', hint: 'Data Science' }
         );
-        expect("Write about [TOPIC: Data Science].".replace(result[0].replaceRegex, 'AI')).toBe("Write about AI.");
+        expect("Write about [TOPIC: Data Science].".replace(getReplaceRegex(result[0].raw), 'AI')).toBe("Write about AI.");
     });
 
     test('should extract variable name and hint separated by em-dash', () => {
@@ -38,7 +45,7 @@ describe('parseVariables function', () => {
         expect(result[0]).toMatchObject(
             { raw: 'TOPIC — Data Science', name: 'TOPIC', hint: 'Data Science' }
         );
-        expect("Write about [TOPIC — Data Science].".replace(result[0].replaceRegex, 'AI')).toBe("Write about AI.");
+        expect("Write about [TOPIC — Data Science].".replace(getReplaceRegex(result[0].raw), 'AI')).toBe("Write about AI.");
     });
 
     test('should handle empty brackets correctly', () => {
@@ -46,7 +53,7 @@ describe('parseVariables function', () => {
         expect(result[0]).toMatchObject(
             { raw: '', name: '', hint: '' }
         );
-        expect("This is an empty [] bracket.".replace(result[0].replaceRegex, 'test')).toBe("This is an empty test bracket.");
+        expect("This is an empty [] bracket.".replace(getReplaceRegex(result[0].raw), 'test')).toBe("This is an empty test bracket.");
     });
 
     test('should return empty array if no variables present', () => {
@@ -63,10 +70,10 @@ describe('parseVariables function', () => {
         expect(result[2]).toMatchObject({ raw: 'TOPIC', name: 'TOPIC', hint: '' });
         expect(result[3]).toMatchObject({ raw: 'AUDIENCE', name: 'AUDIENCE', hint: '' });
         const replacedContent = content
-            .replace(result[0].replaceRegex, 'Draft')
-            .replace(result[1].replaceRegex, 'book')
-            .replace(result[2].replaceRegex, 'science')
-            .replace(result[3].replaceRegex, 'students');
+            .replace(getReplaceRegex(result[0].raw), 'Draft')
+            .replace(getReplaceRegex(result[1].raw), 'book')
+            .replace(getReplaceRegex(result[2].raw), 'science')
+            .replace(getReplaceRegex(result[3].raw), 'students');
         expect(replacedContent).toBe("Prompt: Draft a book about science for students which will be a book.");
     });
 
@@ -74,21 +81,21 @@ describe('parseVariables function', () => {
         const content = "Calculate [A + B (math)?] using [C*D].";
         const result = parseVariables(content);
         expect(result[0]).toMatchObject(
-            { raw: 'A + B (math)?', name: 'A + B (math)?', hint: '', replaceRegex: expect.any(RegExp) }
+            { raw: 'A + B (math)?', name: 'A + B (math)?', hint: '' }
         );
         expect(result[1]).toMatchObject(
-            { raw: 'C*D', name: 'C*D', hint: '', replaceRegex: expect.any(RegExp) }
+            { raw: 'C*D', name: 'C*D', hint: '' }
         );
-        expect(content.replace(result[0].replaceRegex, '10').replace(result[1].replaceRegex, '20')).toBe("Calculate 10 using 20.");
+        expect(content.replace(getReplaceRegex(result[0].raw), '10').replace(getReplaceRegex(result[1].raw), '20')).toBe("Calculate 10 using 20.");
     });
 
     test('should handle variables with leading/trailing spaces', () => {
         const content = "Hello [ NAME ].";
         const result = parseVariables(content);
         expect(result[0]).toMatchObject(
-            { raw: ' NAME ', name: ' NAME ', hint: '', replaceRegex: expect.any(RegExp) }
+            { raw: ' NAME ', name: ' NAME ', hint: '' }
         );
-        expect(content.replace(result[0].replaceRegex, 'Alice')).toBe("Hello Alice.");
+        expect(content.replace(getReplaceRegex(result[0].raw), 'Alice')).toBe("Hello Alice.");
     });
 
     test('should handle hints containing separator characters', () => {
@@ -97,6 +104,6 @@ describe('parseVariables function', () => {
         expect(result).toMatchObject([
             { raw: 'URL: http://localhost:3000', name: 'URL', hint: 'http://localhost:3000' }
         ]);
-        expect(content.replace(result[0].replaceRegex, 'example.com')).toBe("Visit example.com.");
+        expect(content.replace(getReplaceRegex(result[0].raw), 'example.com')).toBe("Visit example.com.");
     });
 });
