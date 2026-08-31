@@ -110,13 +110,10 @@ function parseVariables(content) {
             varHint = rawVar.substring(separatorIndex + 1).trim();
         }
 
-        const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
-
         const variable = {
             raw: rawVar,
             name: varName,
-            hint: varHint,
-            replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
+            hint: varHint
         };
         localVariables.push(variable);
     }
