@@ -351,6 +351,79 @@ describe('Clipboard Copy Functionality', () => {
     });
 });
 
+
+describe('Search Functionality', () => {
+    let originalFetch;
+
+    beforeAll(() => {
+        originalFetch = global.fetch;
+    });
+
+    afterAll(() => {
+        global.fetch = originalFetch;
+    });
+
+    beforeEach(() => {
+        const html = fs.readFileSync(path.resolve(__dirname, './index.html'), 'utf8');
+        const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
+        document.documentElement.innerHTML = cleanHtml;
+        global.fetch = jest.fn();
+    });
+
+    afterEach(() => {
+        jest.resetModules();
+        document.documentElement.innerHTML = '';
+    });
+
+    test('should filter sidebar when input event is fired on search input', async () => {
+        const mockData = {
+            categories: [
+                {
+                    name: 'Test Category',
+                    prompts: [
+                        { id: '1', title: 'Find Me', content: 'Content 1', titleLower: 'find me', contentLower: 'content 1' },
+                        { id: '2', title: 'Ignore Me', content: 'Content 2', titleLower: 'ignore me', contentLower: 'content 2' }
+                    ]
+                }
+            ]
+        };
+
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: async () => mockData
+        });
+
+        // Require app to attach event listeners
+        jest.isolateModules(() => {
+            require('./app.js');
+        });
+
+        // Trigger DOMContentLoaded
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        // Allow microtasks to resolve so fetch completes and renderSidebar is called initially
+        for (let i = 0; i < 5; i++) {
+            await Promise.resolve();
+        }
+
+        const searchInput = document.getElementById('search-input');
+        const sidebarContent = document.getElementById('sidebar-content');
+
+        // Verify initial render (2 prompts)
+        expect(sidebarContent.querySelectorAll('.prompt-btn').length).toBe(2);
+
+        // Dispatch input event to filter
+        searchInput.value = 'find';
+        searchInput.dispatchEvent(new Event('input'));
+
+        // Verify filtered render (1 prompt)
+        const promptButtons = sidebarContent.querySelectorAll('.prompt-btn');
+        expect(promptButtons.length).toBe(1);
+        expect(promptButtons[0].textContent).toBe('Find Me');
+    });
+});
+
 describe('renderSidebar', () => {
     let app;
     let sidebarContent;
