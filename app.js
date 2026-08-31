@@ -78,12 +78,23 @@ function renderSidebar(categories, filterText = '') {
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VARIABLE_REGEX = /\[(.*?)\]/g;
 
-function parseVariables(content) {
-    if (!content) {
-        combinedVariableRegex = null;
-        variablesMap.clear();
-        return [];
+function extractVariableDetails(rawVar) {
+    let name = rawVar;
+    let hint = "";
+    let separatorIndex = rawVar.indexOf('—');
+    if (separatorIndex === -1) {
+        separatorIndex = rawVar.indexOf(':');
     }
+    if (separatorIndex !== -1) {
+        name = rawVar.substring(0, separatorIndex).trim();
+        hint = rawVar.substring(separatorIndex + 1).trim();
+    }
+    return { name, hint };
+}
+
+function parseVariables(content) {
+    if (!content) return [];
+
     const localVariables = [];
     const seenVars = new Set();
     let match;
@@ -99,16 +110,7 @@ function parseVariables(content) {
         seenVars.add(rawVar);
 
         // Split variable name and hint
-        let varName = rawVar;
-        let varHint = "";
-        let separatorIndex = rawVar.indexOf('—');
-        if (separatorIndex === -1) {
-            separatorIndex = rawVar.indexOf(':');
-        }
-        if (separatorIndex !== -1) {
-            varName = rawVar.substring(0, separatorIndex).trim();
-            varHint = rawVar.substring(separatorIndex + 1).trim();
-        }
+        const { name: varName, hint: varHint } = extractVariableDetails(rawVar);
 
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
 
@@ -121,7 +123,11 @@ function parseVariables(content) {
         localVariables.push(variable);
     }
 
-    if (localVariables.length > 0) {
+    return localVariables;
+}
+
+function updateGlobalVariableStates(localVariables) {
+    if (localVariables && localVariables.length > 0) {
         variablesMap.clear();
         const patterns = localVariables.map(v => {
             variablesMap.set(v.raw, v);
@@ -136,7 +142,6 @@ function parseVariables(content) {
         variablesMap.clear();
         combinedVariableRegex = null;
     }
-    return localVariables;
 }
 
 // Select a prompt
@@ -159,6 +164,7 @@ function selectPrompt(prompt, categoryName) {
 
     // Parse variables like [TOPIC], [YOUR NICHE]
     variables = parseVariables(prompt.content);
+    updateGlobalVariableStates(variables);
 
     renderForm();
     updateOutput();
@@ -341,6 +347,8 @@ if (typeof module !== 'undefined' && module.exports) {
         escapeHTML,
         renderSidebar,
         parseVariables,
+        extractVariableDetails,
+        updateGlobalVariableStates,
         selectPrompt,
         renderForm,
         updateOutput,
