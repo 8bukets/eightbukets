@@ -5,6 +5,7 @@ let currentPrompt = null;
 let variables = [];
 let combinedVariableRegex = null;
 let variablesMap = new Map();
+let lastRenderedCategories = null;
 
 const HTML_ESCAPE_MAP = {
     '&': '&amp;',
@@ -26,51 +27,86 @@ function escapeHTML(str) {
 // Render Sidebar
 function renderSidebar(categories, filterText = '') {
     if (!sidebarContent) return;
-    sidebarContent.innerHTML = '';
 
     const filterTextLower = filterText.toLowerCase();
+    const needsRebuild = lastRenderedCategories !== categories || sidebarContent.children.length === 0;
 
+    if (needsRebuild) {
+        sidebarContent.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+
+        categories.forEach(category => {
+            const categoryDiv = document.createElement('div');
+            categoryDiv.className = 'mb-6';
+            category.sidebarElement = categoryDiv;
+
+            const categoryHeader = document.createElement('h3');
+            categoryHeader.className = 'text-xs font-bold text-gray-400 uppercase tracking-wider mb-2';
+            categoryHeader.textContent = category.name;
+            categoryDiv.appendChild(categoryHeader);
+
+            const promptList = document.createElement('ul');
+            promptList.className = 'space-y-1';
+
+            category.prompts.forEach(prompt => {
+                const li = document.createElement('li');
+                prompt.sidebarElement = li;
+
+                const btn = document.createElement('button');
+                prompt.sidebarButton = btn;
+                btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate';
+
+                if (currentPrompt && currentPrompt.id === prompt.id) {
+                    btn.classList.add('bg-indigo-100', 'text-indigo-800', 'font-semibold');
+                } else {
+                    btn.classList.add('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+                }
+
+                btn.textContent = prompt.title;
+                btn.onclick = () => selectPrompt(prompt, category.name);
+
+                li.appendChild(btn);
+                promptList.appendChild(li);
+            });
+
+            categoryDiv.appendChild(promptList);
+            fragment.appendChild(categoryDiv);
+        });
+        sidebarContent.appendChild(fragment);
+        lastRenderedCategories = categories;
+    }
+
+    // Toggle visibility based on filter text and update highlighting
     categories.forEach(category => {
-        const filteredPrompts = category.prompts.filter(prompt => {
+        let hasVisiblePrompts = false;
+
+        category.prompts.forEach(prompt => {
             // Strictly use pre-computed lowercase fields to avoid repeated string manipulation
             // and fallback to empty string if missing to avoid throwing and maintain performance
-            return (prompt.titleLower || '').includes(filterTextLower) || (prompt.contentLower || '').includes(filterTextLower);
-        });
+            const matches = (prompt.titleLower || '').includes(filterTextLower) ||
+                            (prompt.contentLower || '').includes(filterTextLower);
 
-        if (filteredPrompts.length === 0) return;
-
-        const categoryDiv = document.createElement('div');
-        categoryDiv.className = 'mb-6';
-
-        const categoryHeader = document.createElement('h3');
-        categoryHeader.className = 'text-xs font-bold text-gray-400 uppercase tracking-wider mb-2';
-        categoryHeader.textContent = category.name;
-        categoryDiv.appendChild(categoryHeader);
-
-        const promptList = document.createElement('ul');
-        promptList.className = 'space-y-1';
-
-        filteredPrompts.forEach(prompt => {
-            const li = document.createElement('li');
-            const btn = document.createElement('button');
-            btn.className = 'prompt-btn w-full text-left px-3 py-2 rounded text-sm transition-colors truncate';
-
-            // Add highlighting if this is the currently selected prompt
-            if (currentPrompt && currentPrompt.id === prompt.id) {
-                btn.classList.add('bg-indigo-100', 'text-indigo-800', 'font-semibold');
+            if (matches) {
+                prompt.sidebarElement.style.display = '';
+                hasVisiblePrompts = true;
             } else {
-                btn.classList.add('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+                prompt.sidebarElement.style.display = 'none';
             }
 
-            btn.textContent = prompt.title;
-            btn.onclick = () => selectPrompt(prompt, category.name);
-
-            li.appendChild(btn);
-            promptList.appendChild(li);
+            if (!needsRebuild) {
+                const btn = prompt.sidebarButton;
+                if (currentPrompt && currentPrompt.id === prompt.id) {
+                    btn.classList.add('bg-indigo-100', 'text-indigo-800', 'font-semibold');
+                    btn.classList.remove('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+                } else {
+                    btn.classList.add('text-gray-700', 'hover:bg-indigo-50', 'hover:text-indigo-700');
+                    btn.classList.remove('bg-indigo-100', 'text-indigo-800', 'font-semibold');
+                }
+            }
         });
 
-        categoryDiv.appendChild(promptList);
-        sidebarContent.appendChild(categoryDiv);
+        // Hide category if no prompts are visible
+        category.sidebarElement.style.display = hasVisiblePrompts ? '' : 'none';
     });
 }
 
