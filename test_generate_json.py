@@ -230,5 +230,16 @@ This is some content. How to Get Maximum Value From This Collection More content
         self.assertIn("File not found:", str(cm.exception))
         self.assertIn("this_file_definitely_does_not_exist_at_all.txt", str(cm.exception))
 
+    def test_parse_prompts_default_filename_integration(self):
+        # Call parse_prompts without any arguments to test the default behavior
+        # This will read the actual prompts.txt file
+        result = parse_prompts()
+
+        # Verify that we get the expected structure and number of categories
+        self.assertIn("categories", result)
+        self.assertEqual(len(result["categories"]), 5)
+        # Just a basic check that it's actually pulling real data
+        self.assertGreater(len(result["categories"][0]["prompts"]), 0)
+
 if __name__ == '__main__':
     unittest.main()
