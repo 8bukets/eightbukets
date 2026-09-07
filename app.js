@@ -78,6 +78,20 @@ function renderSidebar(categories, filterText = '') {
 const ESCAPE_REGEX = /[-\/\\^$*+?.()|[\]{}]/g;
 const VARIABLE_REGEX = /\[(.*?)\]/g;
 
+function extractVariableDetails(rawVar) {
+    let name = rawVar;
+    let hint = "";
+    let separatorIndex = rawVar.indexOf('—');
+    if (separatorIndex === -1) {
+        separatorIndex = rawVar.indexOf(':');
+    }
+    if (separatorIndex !== -1) {
+        name = rawVar.substring(0, separatorIndex).trim();
+        hint = rawVar.substring(separatorIndex + 1).trim();
+    }
+    return { name, hint };
+}
+
 function parseVariables(content) {
     if (!content) {
         combinedVariableRegex = null;
@@ -98,24 +112,13 @@ function parseVariables(content) {
         }
         seenVars.add(rawVar);
 
-        // Split variable name and hint
-        let varName = rawVar;
-        let varHint = "";
-        let separatorIndex = rawVar.indexOf('—');
-        if (separatorIndex === -1) {
-            separatorIndex = rawVar.indexOf(':');
-        }
-        if (separatorIndex !== -1) {
-            varName = rawVar.substring(0, separatorIndex).trim();
-            varHint = rawVar.substring(separatorIndex + 1).trim();
-        }
-
+        const { name, hint } = extractVariableDetails(rawVar);
         const escapedVariable = rawVar.replace(ESCAPE_REGEX, '\\$&');
 
         const variable = {
             raw: rawVar,
-            name: varName,
-            hint: varHint,
+            name,
+            hint,
             replaceRegex: new RegExp(`\\[${escapedVariable}\\]`, 'g')
         };
         localVariables.push(variable);
