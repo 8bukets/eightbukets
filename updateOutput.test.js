@@ -193,4 +193,27 @@ describe('updateOutput function', () => {
 
         expect(promptOutput.innerHTML).toContain('Replace <span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">Short</span> and <span class="bg-indigo-100 text-indigo-800 font-medium px-1 rounded">Longer</span>.');
     });
+
+    test('should bypass regex matches and output text when combinedVariableRegex is null', () => {
+        const promptOutput = document.createElement('div');
+        app.setPromptOutput(promptOutput);
+
+        app.setCurrentPrompt({
+            id: 'test-7',
+            title: 'Test No Variables',
+            content: 'Just some plain text without variables.'
+        });
+
+        const dynamicForm = document.getElementById('dynamic-form');
+        app.setDynamicForm(dynamicForm);
+
+        // selectPrompt will call parseVariables, which sets combinedVariableRegex to null
+        // because there are no variables.
+        app.selectPrompt(app.getCurrentPrompt(), 'Category');
+
+        app.updateOutput();
+
+        // The text should be exactly the content, properly escaped (which in this case is just the text)
+        expect(promptOutput.innerHTML).toBe('Just some plain text without variables.');
+    });
 });
