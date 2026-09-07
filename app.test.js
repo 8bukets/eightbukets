@@ -459,3 +459,74 @@ describe('renderSidebar', () => {
         expect(promptButtons[2].classList.contains('bg-indigo-100')).toBe(false);
     });
 });
+
+describe('Search functionality', () => {
+    let app;
+    let searchInput;
+    let sidebarContent;
+
+    beforeEach(() => {
+        // Load the HTML into JSDOM before each test to reset DOM
+        const html = fs.readFileSync(require('path').resolve(__dirname, './index.html'), 'utf8');
+        const cleanHtml = html.replace(/<!DOCTYPE html>/gi, '');
+        document.documentElement.innerHTML = cleanHtml;
+
+        // Mock fetch to prevent network errors in DOMContentLoaded
+        global.fetch = jest.fn(() => Promise.resolve({
+            json: () => Promise.resolve({ categories: [
+                {
+                    name: 'Category 1',
+                    prompts: [
+                        { id: '1', title: 'Prompt 1', content: 'Content 1 [VAR]' }
+                    ]
+                }
+            ] })
+        }));
+    });
+
+    afterEach(() => {
+        jest.resetModules();
+        document.documentElement.innerHTML = '';
+        jest.clearAllMocks();
+    });
+
+    test('should attach input event listener to searchInput and trigger renderSidebar', async () => {
+        // Require app.js to attach event listeners
+        jest.isolateModules(() => {
+            app = require('./app.js');
+        });
+
+        // Trigger DOMContentLoaded
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+        await new Promise(process.nextTick);
+
+        searchInput = document.getElementById('search-input');
+        sidebarContent = document.getElementById('sidebar-content');
+
+        // Verify initial state
+        expect(searchInput).not.toBeNull();
+
+        // Before input event, all categories should be visible
+        // (Mock fetch sets up 1 category with 1 prompt)
+        expect(sidebarContent.querySelectorAll('h3').length).toBe(1);
+        expect(sidebarContent.querySelectorAll('.prompt-btn').length).toBe(1);
+
+        // Dispatch input event on searchInput with a filter that doesn't match
+        searchInput.value = 'nonexistent search query';
+        const inputEvent = new Event('input');
+        searchInput.dispatchEvent(inputEvent);
+
+        // Sidebar content should now be empty because 'renderSidebar' was called with the non-matching filter
+        expect(sidebarContent.innerHTML).toBe('');
+
+        // Dispatch input event on searchInput with a filter that matches
+        searchInput.value = 'Content 1';
+        searchInput.dispatchEvent(new Event('input'));
+
+        // Sidebar content should render the matching prompt
+        expect(sidebarContent.querySelectorAll('h3').length).toBe(1);
+        expect(sidebarContent.querySelectorAll('.prompt-btn').length).toBe(1);
+        expect(sidebarContent.querySelector('.prompt-btn').textContent).toBe('Prompt 1');
+    });
+});
