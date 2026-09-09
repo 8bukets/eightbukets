@@ -22,6 +22,9 @@ def parse_prompts(data=None, filename='prompts.txt'):
     if data is None:
         data = read_prompt_file(filename)
 
+    # Remove known textual artifacts globally before parsing
+    data = data.replace("How to Get Maximum Value From This Collection", "")
+
     categories = []
 
     # Split by Parts
@@ -41,7 +44,7 @@ def parse_prompts(data=None, filename='prompts.txt'):
         for j in range(1, len(prompt_blocks), 3):
             pid = int(prompt_blocks[j])
             title = prompt_blocks[j+1].strip()
-            content = prompt_blocks[j+2].replace("How to Get Maximum Value From This Collection", "").strip()
+            content = prompt_blocks[j+2].strip()
 
             prompts.append({
                 "id": pid,
